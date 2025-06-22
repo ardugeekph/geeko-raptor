@@ -16,7 +16,7 @@ class MotorEncoder {
         float getRpm();
         int getTicksPerRevolution();
         float getDistance();
-        void setWheelDiameter(float diameter);
+        void setWheelDiameter(float diameter = 1.2);
         float getWheelDiameter();
 
     private:
@@ -28,7 +28,7 @@ class MotorEncoder {
         unsigned long lastUpdate = 0;
         float rpm = 0;
         int ticksPerRevolution = 135;
-        float wheelDiameter = 1.1;
+        float wheelDiameter = 0;
 };
 
 #endif
