@@ -14,7 +14,7 @@ float PIDController::output(float error) {
     unsigned long deltaTime = now - lastUpdate;
 	
 
-    if (deltaTime >= 10) {
+    if (deltaTime >= 20) {
 		// Calculate P, I, D
 		pOut = error * kP_;
 		iOut += kI_ * error;
