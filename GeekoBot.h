@@ -17,7 +17,7 @@ class GeekoBot{
 
  		void begin(int motorRpm = 2000, float wheelDiameter = 1.1);
 		void calibrateSensors();
-		void moveStraight(int rpm);
+		void moveStraight(int rpm, bool (*stopCallback)());
 		void stop();
 		void update();
 

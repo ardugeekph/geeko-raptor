@@ -21,7 +21,7 @@ void GeekoBot::begin(int motorRpm, float wheelDiameter) {
 	sensor.begin();
 
 	// Controllers
-	moveStraightPIDController.setConstants(0.5, 0.0, 0.02);
+	moveStraightPIDController.setConstants(20.00, 5.00, 20.00);
 }
 
 
@@ -30,28 +30,41 @@ void GeekoBot::calibrateSensors() {
 }
 
 
-void GeekoBot::moveStraight(int rpm) {
-	update();
+void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
 
-	// Right motor to adjust speed based on left motor RPM
-	float rpmL = motorLeft.encoder.getRpm();
-	float rpmR = motorRight.encoder.getRpm();
+	while (true) {
+		if (stopCallback()) {
+			stop();
+			return;
+		}
+		
+		// Update encoders and sensors
+		update();
+		
+		// Get distance traveled by each wheel
+		float distanceL = motorLeft.encoder.getDistance();  // in inches
+		float distanceR = motorRight.encoder.getDistance(); // in inches
 
-	// Compute error between distances
-	float error = rpmL - rpmR;
-	int adjust = moveStraightPIDController.output(error);
+		// Compute error in distance
+		float error = distanceL - distanceR;
 
+		// PID output based on distance error
+		int adjust = moveStraightPIDController.output(error);
 
-	Serial.println("Target RPM: " + String(rpm) + 
-		" \t " + String(rpmL) + 
-		" \t " + String(rpmR) + 
-		" \t " + String(adjust));
+		// Debug output
+		// Serial.println("Target RPM: " + String(rpm) + 
+		// 	" \t Dist L: " + String(distanceL) + 
+		// 	" \t Dist R: " + String(distanceR) + 
+		// 	" \t Error: " + String(error) + 
+		// 	" \t Adjust: " + String(adjust));
 
-	// // Apply correction to left motor speed
-	motorLeft.setRpmSpeed(constrain(rpm-adjust, 0, motorLeft.getMotorRPM()));
+		// Apply correction: slow down the wheel that went farther
+		int rpmL = constrain(rpm - adjust, 0, motorLeft.getMotorRPM());
+		int rpmR = constrain(rpm + adjust, 0, motorRight.getMotorRPM());
 
-	// // Apply correction to right motor speed
-	motorRight.setRpmSpeed(constrain(rpm+adjust, 0, motorRight.getMotorRPM()));
+		motorLeft.setRpmSpeed(rpmL);
+		motorRight.setRpmSpeed(rpmR);
+	}
 }
 
 void GeekoBot::stop() {
