@@ -15,7 +15,7 @@ void MotorController::begin(int motorA, int motorB, int motorPwm, int motorC1, i
 
 		encoder.begin(motorC1, motorC2);
 		encoder.setWheelDiameter(wheelDiameter_);
-		pidController.setConstants(0.2, 0.00, 0.02);
+		pidController.setConstants(0.3, 0.05, 0.00);
 }
 
 
@@ -45,49 +45,55 @@ void MotorController::setSpeed(int pwm){
 
 
 void MotorController::setRpmSpeed(float targetRPM, float accel) {
-	unsigned long now = millis();
-	if (now - lastUpdate < MOTOR_CONTROL_UPDATE_INTERVAL) return;
-	lastUpdate = now;
+    unsigned long now = millis();
+    float deltaT = (now - lastUpdate) / 1000.0;
+    if (deltaT < 0.1) return;  // prevent over-updating
+    lastUpdate = now;
 
-	// Convert acceleration m/s^2 → RPM per loop interval
-	float wheelDiameterMeters = encoder.getWheelDiameter() * 0.0254;
-	float accelRpmPerSec = (accel / (PI * wheelDiameterMeters)) * 60.0;
-	float accelRpmPerUpdate = accelRpmPerSec * (MOTOR_CONTROL_UPDATE_INTERVAL / 1000.0);
+    // Convert acceleration m/s^2 → RPM per loop interval
+    float wheelDiameterMeters = encoder.getWheelDiameter() * 0.0254;
+    float accelRpmPerSec = (accel / (PI * wheelDiameterMeters)) * 60.0;
+	float accelRpmPerUpdate = accelRpmPerSec * deltaT;
 
-	// Ramp up/down current setpoint toward target RPM
-	if (currentSetpointRPM < targetRPM) {
-		currentSetpointRPM += accelRpmPerUpdate;
-		if (currentSetpointRPM > targetRPM) currentSetpointRPM = targetRPM;
-	} else if (currentSetpointRPM > targetRPM) {
-		currentSetpointRPM -= accelRpmPerUpdate;
-		if (currentSetpointRPM < targetRPM) currentSetpointRPM = targetRPM;
-	}
+    float currentRPM = encoder.getRpm();
 
-	// Serial.print(wheelDiameterMeters);
-	// Serial.print("\t");
-	// Serial.print(accelRpmPerSec);
-	// Serial.print("\t");
-	// Serial.print(accelRpmPerUpdate);
-	// Serial.print("\t");
-	// Serial.print(currentSetpointRPM);
+    // Smoothly ramp current setpoint RPM toward the target
+    if (abs(currentSetpointRPM - targetRPM) > accelRpmPerUpdate) {
+        if (currentSetpointRPM < targetRPM) {
+            currentSetpointRPM += accelRpmPerUpdate;
+        } else {
+            currentSetpointRPM -= accelRpmPerUpdate;
+        }
+    } else {
+        currentSetpointRPM = targetRPM;
+    }
 
+    // PID control based on the current RPM error
+    float rpmCorrection = pidController.output(currentSetpointRPM - currentRPM);
+    float finalRPM = currentSetpointRPM + rpmCorrection;
 
-	// Serial.print("RPM: \t");
-	// Serial.print(rpm);
-	// Serial.print("\t");
-	// Serial.print(encoder.getRpm());
+    float pwm = (255.0 / float(motorRPM)) * finalRPM;
+    pwm = constrain(pwm, 0, 255);
 
-	float currentRPM = encoder.getRpm();
-	float rpmCorrection = pidController.output(currentSetpointRPM - currentRPM);
-	float finalRPM = currentSetpointRPM + rpmCorrection;
-	float pwm = (255/float(motorRPM))*finalRPM;
+    // Debugging output
+    // Serial.print("T: ");
+    // Serial.print(now);
+    // Serial.print(" | Dia: ");
+    // Serial.print(wheelDiameterMeters);
+    // Serial.print(" | AccelRPM/s: ");
+    // Serial.print(accelRpmPerSec);
+    // Serial.print(" | RPM/update: ");
+    // Serial.print(accelRpmPerUpdate);
+    // Serial.print(" | Setpoint: ");
+    // Serial.print(currentSetpointRPM);
+    // Serial.print(" | RPM: ");
+    // Serial.print(currentRPM);
+    // Serial.print(" | Correc: ");
+    // Serial.print(rpmCorrection);
+    // Serial.print(" | PWM: ");
+    // Serial.println(pwm);
 
-	// Serial.print("\t");
-	// Serial.print(targetRPM);
-	// Serial.print("\t");
-	// Serial.println(currentRPM);
-
-	setSpeed(pwm);
+    setSpeed(pwm);
 }
 
 
