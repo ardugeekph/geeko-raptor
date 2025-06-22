@@ -44,7 +44,9 @@ void MotorController::setSpeed(int pwm){
 }
 
 
-void MotorController::setRpmSpeed(float targetRPM, float accel) {
+void MotorController::setRpmSpeed(float targetRPM, float accel, bool reverse) {
+	encoder.update();  // Ensure encoder is updated before calculations
+
     unsigned long now = millis();
     float deltaT = (now - lastUpdate) / 1000.0;
     if (deltaT < 0.1) return;  // prevent over-updating
@@ -55,7 +57,7 @@ void MotorController::setRpmSpeed(float targetRPM, float accel) {
     float accelRpmPerSec = (accel / (PI * wheelDiameterMeters)) * 60.0;
 	float accelRpmPerUpdate = accelRpmPerSec * deltaT;
 
-    float currentRPM = encoder.getRpm();
+    float currentRPM = abs(encoder.getRpm());
 
     // Smoothly ramp current setpoint RPM toward the target
     if (abs(currentSetpointRPM - targetRPM) > accelRpmPerUpdate) {
@@ -74,6 +76,10 @@ void MotorController::setRpmSpeed(float targetRPM, float accel) {
 
     float pwm = (255.0 / float(motorRPM)) * finalRPM;
     pwm = constrain(pwm, 0, 255);
+
+	if (reverse) {
+		pwm = -pwm;  // Reverse direction if needed
+	}
 
     // Debugging output
     // Serial.print("T: ");
