@@ -21,7 +21,7 @@ void GeekoBot::begin(int motorRpm, float wheelDiameter) {
 	sensor.begin();
 
 	// Controllers
-	moveStraightPIDController.setConstants(20.00, 5.00, 20.00);
+	moveStraightPIDController.setConstants(3.00, 0.05, 0.50);
 }
 
 
@@ -51,7 +51,7 @@ void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
 		// PID output based on distance error
 		int adjust = moveStraightPIDController.output(error);
 
-		// Debug output
+		// // Debug output
 		// Serial.println("Target RPM: " + String(rpm) + 
 		// 	" \t Dist L: " + String(distanceL) + 
 		// 	" \t Dist R: " + String(distanceR) + 
@@ -59,11 +59,11 @@ void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
 		// 	" \t Adjust: " + String(adjust));
 
 		// Apply correction: slow down the wheel that went farther
-		int rpmL = constrain(rpm - adjust, 0, motorLeft.getMotorRPM());
-		int rpmR = constrain(rpm + adjust, 0, motorRight.getMotorRPM());
+		int rpmL = rpm - adjust;
+		int rpmR = rpm + adjust;
 
-		motorLeft.setRpmSpeed(rpmL);
-		motorRight.setRpmSpeed(rpmR);
+		motorLeft.setRpmSpeed(rpmL, 1, rpmL < 0);
+		motorRight.setRpmSpeed(rpmR, 1, rpmL < 0);
 	}
 }
 
