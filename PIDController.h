@@ -8,6 +8,7 @@ class PIDController {
     public:
         void setConstants(float kP, float kI, float kD);
         float output(float error);
+        void reset();
 
     private:
 		float kP_, kI_, kD_;

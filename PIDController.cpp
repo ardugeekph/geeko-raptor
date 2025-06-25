@@ -47,3 +47,11 @@ float PIDController::output(float error) {
 
 	return pid_output;
 }
+
+void PIDController::reset() {
+	lastError = 0;
+	pOut = 0;
+	iOut = 0;
+	dOut = 0;
+	pid_output = 0;
+}
