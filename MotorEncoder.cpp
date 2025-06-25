@@ -69,7 +69,7 @@ void MotorEncoder::update() {
 
 
 float MotorEncoder::getRpm() {
-    return rpm;
+    return abs(rpm);
 }
 
 
