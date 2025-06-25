@@ -75,6 +75,7 @@ void MotorController::setRpmSpeed(float targetRPM, float accel, bool reverse) {
     float finalRPM = currentSetpointRPM + rpmCorrection;
 
     float pwm = (255.0 / float(motorRPM)) * finalRPM;
+	pwm = 0.00007 * finalRPM * finalRPM + 0.08 * finalRPM + 40;
     pwm = constrain(pwm, 0, 255);
 
 	if (reverse) {
