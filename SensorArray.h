@@ -9,7 +9,6 @@ class SensorArray {
     public:
         void begin();
         void calibrate(MotorController& motorL, MotorController& motorR);
-
         void readIrRaw(int* irVals);
 		void readIrCalibrated(int* irVals);
         bool isOut();	// returns the status of robot if it is outside the track
@@ -30,6 +29,7 @@ class SensorArray {
 		void restoreIrCalibration(int* lowest, int *highest, int* contrast);
 
 		bool outside = false;
+		int lastChannelSeen = 4;
 };
 
 #endif

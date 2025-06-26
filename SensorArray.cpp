@@ -25,15 +25,22 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 
     int counter = 0;
 	int high, low;
-	unsigned int timer = millis();
+	bool isCentered = false;
 
 	while(counter < 4){
-		if (counter % 2 == 0){
-			motorL.setSpeed(100);
-			motorR.setSpeed(100);
-		} else {
-			motorL.setSpeed(-100);
-			motorR.setSpeed(-100);
+		motorL.encoder.update();
+		motorR.encoder.update();
+		motorL.setRpmSpeed(300, 1, false);
+		motorR.setRpmSpeed(300, 1, true);
+
+		int contrast_temp = high - low;
+		int mid = irVal_[4];
+		
+		if (mid > contrast_temp / 2 && !isCentered) {
+			isCentered = true;
+			counter++;
+		} else if (mid < contrast_temp / 2 && isCentered) {
+			isCentered = false;
 		}
 
 		readIrRaw(irVal_);
@@ -42,11 +49,6 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 			if(irVal_[i] < low) low = irVal_[i];
 			if(irVal_[i] > highest_[i]) highest_[i] = irVal_[i];
 			if(irVal_[i] < lowest_[i]) lowest_[i] = irVal_[i];
-		}
-
-		if (millis() - timer > SCAN_TIME) {
-			counter += 1;
-			timer = millis();
 		}
 	}
 
@@ -177,5 +179,45 @@ int SensorArray::getContrast() {
 
 
 int SensorArray::getPos() {
-    return 0;
+
+	readIrCalibrated(irVal_);
+
+  	float total = (irVal_[0]*0) + (irVal_[1]*1000.00) + (irVal_[2]*2000.00) + (irVal_[3]*3000.00) + (irVal_[4]*4000.00) + (irVal_[5]*5000.00) + (irVal_[6]*6000.00) + (irVal_[7]*7000.00);
+  	float pos = total/(irVal_[0] + irVal_[1] + irVal_[2] + irVal_[3] + irVal_[4] + irVal_[5] + irVal_[6] + irVal_[7]);
+
+    // for (int i = 0; i < 8; i++) {
+    //     Serial.print(irVal_[i]);
+    //     Serial.print("\t");
+    // }
+    // Serial.println();
+
+	//  get lowest and highest reading to know the current contrast
+  	int low=7000, high=0;
+  	for(int i = 0; i < 8; i++){
+    		if(irVal_[i] > high) high = irVal_[i];
+    		if(irVal_[i] < low) low = irVal_[i];
+  	}
+
+	
+	// set outside_ status
+  	if(high-low > contrast_/3) outside = false;
+  	else outside = true;
+
+	int highest_val = 0;
+  	if(!outside){
+		for(int i = 0; i < 8; i++){
+			if(irVal_[i] > highest_val){
+				highest_val = irVal_[i];
+				lastChannelSeen = i;
+			}
+		}
+  	}
+
+	if(outside) {
+		if(lastChannelSeen == 0) pos = 0;
+		else if(lastChannelSeen == 7) pos = 7000;
+		else pos = 0;
+  	}
+
+    return pos - 3500;
 }
