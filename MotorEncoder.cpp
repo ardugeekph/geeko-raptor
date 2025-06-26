@@ -13,6 +13,7 @@ void MotorEncoder::begin(int motorC1, int motorC2) {
 void MotorEncoder::increment() {
     noInterrupts();
     tickCount++;
+    cummulativeTickCount++;
     interrupts();
 }
 
@@ -20,6 +21,7 @@ void MotorEncoder::increment() {
 void MotorEncoder::decrement() {
     noInterrupts();
     tickCount--;
+    cummulativeTickCount++;
     interrupts();
 }
 
@@ -27,6 +29,7 @@ void MotorEncoder::decrement() {
 void MotorEncoder::reset() {
     noInterrupts();
     tickCount = 0;
+    lastTickCount = 0;
     interrupts();
 }
 
@@ -69,12 +72,7 @@ void MotorEncoder::update() {
 
 
 float MotorEncoder::getRpm() {
-    return abs(rpm);
-}
-
-
-int MotorEncoder::getTicksPerRevolution() {
-    return ticksPerRevolution;
+    return rpm;
 }
 
 
@@ -90,5 +88,11 @@ float MotorEncoder::getWheelDiameter() {
 
 float MotorEncoder::getDistance() {
 	float circumference = 3.14159 * wheelDiameter; // in inches
-	return (getTicks() / float(ticksPerRevolution)) * circumference; // return distance in inches
+	return (cummulativeTickCount / float(ticksPerRevolution)) * circumference; // return distance in inches
+}
+
+
+float MotorEncoder::getDirectionalDistance() {
+	float circumference = 3.14159 * wheelDiameter; // in inches
+	return (tickCount / float(ticksPerRevolution)) * circumference; // return distance in inches
 }

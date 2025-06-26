@@ -12,12 +12,12 @@ class MotorEncoder {
         void decrement();
         void reset();
         long getTicks();
-        void update();
         float getRpm();
-        int getTicksPerRevolution();
         float getDistance();
+        float getDirectionalDistance();
         void setWheelDiameter(float diameter = 1.2);
         float getWheelDiameter();
+        void update();
 
     private:
         int motorC1Pin;
@@ -26,6 +26,7 @@ class MotorEncoder {
         volatile long tickCount = 0;
         volatile long lastTickCount = 0;
         unsigned long lastUpdate = 0;
+        volatile long cummulativeTickCount = 0;
         float rpm = 0;
         int ticksPerRevolution = 135;
         float wheelDiameter = 0;
