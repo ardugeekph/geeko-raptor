@@ -11,21 +11,11 @@ void MotorController::begin(int motorA, int motorB, int motorPwm, int motorC1, i
 		pinMode(motorApin, OUTPUT);
 		pinMode(motorBpin, OUTPUT);
 		pinMode(motorPwmPin, OUTPUT);
-		setMotorRPM(motorRPM_);
+		motorRPM = motorRPM_;
 
 		encoder.begin(motorC1, motorC2);
 		encoder.setWheelDiameter(wheelDiameter_);
 		pidController.setConstants(0.3, 0.05, 0.00);
-}
-
-
-int MotorController::getMotorRPM() {
-    return motorRPM;
-}
-
-
-void MotorController::setMotorRPM(int rpm) {
-    motorRPM = rpm;
 }
 
 
@@ -46,6 +36,7 @@ void MotorController::setSpeed(int pwm){
 
 void MotorController::setRpmSpeed(float targetRPM, float accel, bool reverse) {
 	encoder.update();  // Ensure encoder is updated before calculations
+	targetRPM = abs(targetRPM);
 
     unsigned long now = millis();
     float deltaT = (now - lastUpdate) / 1000.0;
@@ -82,7 +73,7 @@ void MotorController::setRpmSpeed(float targetRPM, float accel, bool reverse) {
 		pwm = -pwm;  // Reverse direction if needed
 	}
 
-    // Debugging output
+    // // Debugging output
     // Serial.print("T: ");
     // Serial.print(now);
     // Serial.print(" | Dia: ");
@@ -108,4 +99,8 @@ void MotorController::stop(){
 	digitalWrite(motorApin, HIGH);
   	digitalWrite(motorBpin, HIGH);
   	analogWrite(motorPwmPin, 255);
+
+	currentSetpointRPM = 0;
+	pidController.reset();
+	lastUpdate = millis();
 }
