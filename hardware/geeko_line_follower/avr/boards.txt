@@ -1,0 +1,19 @@
+raptor.name=Geeko Raptor (Intermediate)
+
+raptor.upload.tool=arduino:avrdude
+raptor.upload.protocol=arduino
+raptor.upload.maximum_size=32256
+raptor.upload.speed=115200
+
+raptor.bootloader.tool=arduino:avrdude
+raptor.bootloader.low_fuses=0xFF
+raptor.bootloader.high_fuses=0xDA
+raptor.bootloader.extended_fuses=0x05
+raptor.bootloader.file=optiboot/optiboot_atmega328.hex
+
+raptor.build.mcu=atmega328p
+raptor.build.f_cpu=16000000L
+raptor.build.board=AVR_GEEKO_RAPTOR
+raptor.build.core=arduino:arduino
+raptor.build.variant=raptor
+raptor.build.arch=avr
