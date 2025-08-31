@@ -11,6 +11,9 @@ void SensorArray::begin() {
 	// Initialize MUX OUTPUT
 	pinMode(IR_MUX_OUTPUT, INPUT);
 
+	// Initialize LEDs
+	DDRD |= (1 << PD6) | (1 << PD5);
+
     restoreIrCalibration(lowest_, highest_, &contrast_);
 }
 
