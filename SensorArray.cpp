@@ -38,7 +38,7 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 
 		int mid_threshold = ((highest_[4] - lowest_[4]) / 2) + lowest_[4];
 		int mid = irVal_[4];
-		
+
 		// Serial.print("Threshold: ");
 		// Serial.print(mid_threshold);
 		// Serial.print("\tMid: ");
@@ -232,4 +232,35 @@ int SensorArray::getPos() {
   	}
 
     return pos - 3500;
+}
+
+bool SensorArray::isCheckpoint() {
+	bool leftSenIsActive = (irVal_[0] > ((((highest_[0] - lowest_[0])/2)+lowest_[0])) * 0.5) && (highest_[3] * 0.9) < irVal_[0];
+	bool rightSenIsActive = (irVal_[7] > ((((highest_[7] - lowest_[7])/2)+lowest_[7])) * 0.5)  && (highest_[3] * 0.9) < irVal_[7];
+	bool mid1SenIsActive = irVal_[3] > (((highest_[3] - lowest_[3])/2)+lowest_[3]) * 0.5;
+	bool mid2SenIsActive = irVal_[4] > (((highest_[4] - lowest_[4])/2)+lowest_[4]) * 0.5;
+	bool backSenIsActive = irVal_[8] > (((highest_[8] - lowest_[8])/2)+lowest_[8]) * 0.5;
+
+	// Serial.print("leftSenIsActive: ");
+	// Serial.print(leftSenIsActive);
+	// Serial.print("\t mid1SenIsActive: ");
+	// Serial.print(mid1SenIsActive);
+	// Serial.print("\t mid2SenIsActive: ");
+	// Serial.print(mid2SenIsActive);
+	// Serial.print("\t rightSenIsActive: ");
+	// Serial.print(rightSenIsActive);
+	// Serial.print("\t backSenIsActive: ");
+	// Serial.println(backSenIsActive);
+	if (
+		!outside && 
+		leftSenIsActive && 
+		rightSenIsActive && 
+		(mid1SenIsActive || mid2SenIsActive) && 
+		backSenIsActive
+	) { // && !lastIsCheckpoint) {
+		// lastIsCheckpoint = true;
+		return true;
+	}
+	// lastIsCheckpoint = false;
+	return false;
 }

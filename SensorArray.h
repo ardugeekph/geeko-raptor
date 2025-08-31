@@ -14,6 +14,7 @@ class SensorArray {
         bool isOut();	// returns the status of robot if it is outside the track
  		int getPos();
         int getContrast();
+		bool isCheckpoint();
 
     private:
 		int irVal_[9];
@@ -30,6 +31,7 @@ class SensorArray {
 
 		bool outside = false;
 		int lastChannelSeen = 4;
+		bool lastIsCheckpoint = false;
 };
 
 #endif
