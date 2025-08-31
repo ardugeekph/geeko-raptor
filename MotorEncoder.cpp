@@ -48,7 +48,7 @@ void MotorEncoder::attachEncoderInterrupt(void (*isr)()) {
 void MotorEncoder::update() {
     unsigned long now = millis();
     unsigned long deltaTime = now - lastUpdate;
-    if (deltaTime >= 5) {
+    if (deltaTime >= 20) {
         // Serial.print(tickCount);
         // Serial.print("\t");
         noInterrupts();
@@ -62,7 +62,7 @@ void MotorEncoder::update() {
         // Serial.print("\t");
 
 
-        rpm = (ticks / float(ticksPerRevolution)) * (60000.0000 / float(deltaTime));
+        rpm = float(ticks / float(ticksPerRevolution)) * (60000.00 / float(deltaTime));
         lastTickCount = tickCount;
         lastUpdate = now;
 
