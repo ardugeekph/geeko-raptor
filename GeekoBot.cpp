@@ -34,6 +34,8 @@ void GeekoBot::calibrateSensors() {
 
 
 void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
+	float initDistanceL = motorLeft.encoder.getDistance();  // in inches
+	float initDistanceR = motorRight.encoder.getDistance(); // in inches
 
 	while (true) {
 		if (stopCallback()) {
@@ -45,8 +47,8 @@ void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
 		update();
 		
 		// Get distance traveled by each wheel
-		float distanceL = motorLeft.encoder.getDistance();  // in inches
-		float distanceR = motorRight.encoder.getDistance(); // in inches
+		float distanceL = motorLeft.encoder.getDistance() - initDistanceL;  // in inches
+		float distanceR = motorRight.encoder.getDistance() - initDistanceR; // in inches
 
 		// Compute error in distance
 		float error = distanceL - distanceR;
@@ -66,7 +68,7 @@ void GeekoBot::moveStraight(int rpm, bool (*stopCallback)()) {
 		int rpmR = rpm + adjust;
 
 		motorLeft.setRpmSpeed(rpmL, 1, rpmL < 0);
-		motorRight.setRpmSpeed(rpmR, 1, rpmL < 0);
+		motorRight.setRpmSpeed(rpmR, 1, rpmR < 0);
 	}
 }
 
