@@ -24,7 +24,7 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
     }
 
     int counter = 0;
-	int high, low;
+	int high = 0, low = 1023;
 	bool isCentered = false;
 
 	while(counter < 4){
@@ -33,13 +33,20 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 		motorL.setRpmSpeed(300, 1, false);
 		motorR.setRpmSpeed(300, 1, true);
 
-		int contrast_temp = high - low;
+		int mid_threshold = ((highest_[4] - lowest_[4]) / 2) + lowest_[4];
 		int mid = irVal_[4];
 		
-		if (mid > contrast_temp / 2 && !isCentered) {
+		// Serial.print("Threshold: ");
+		// Serial.print(mid_threshold);
+		// Serial.print("\tMid: ");
+		// Serial.print(mid);
+		// Serial.print("\tCounter: ");
+		// Serial.println(counter);
+		
+		if (mid > mid_threshold && !isCentered) {
 			isCentered = true;
 			counter++;
-		} else if (mid < contrast_temp / 2 && isCentered) {
+		} else if (mid < mid_threshold && isCentered) {
 			isCentered = false;
 		}
 
