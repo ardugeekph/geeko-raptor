@@ -202,8 +202,8 @@ int SensorArray::getPos() {
 
 	
 	// set outside_ status
-  	if(high-low > contrast_/3) outside = false;
-  	else outside = true;
+  	if(high-low < contrast_/2) outside = true;
+  	else outside = false;
 
 	int highest_val = 0;
   	if(!outside){
