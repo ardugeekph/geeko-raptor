@@ -7,6 +7,7 @@
 #include "SensorArray.h"
 #include "MotorController.h"
 #include "PIDController.h"
+#include "Buzzer.h"
 
 
 class GeekoBot{
@@ -14,6 +15,7 @@ class GeekoBot{
 		MotorController motorLeft;
 		MotorController motorRight;
 		SensorArray sensor;
+		Buzzer buzzer;
 
  		void begin(int motorRpm = 2000, float wheelDiameter = 1.1);
 		void calibrateSensors();

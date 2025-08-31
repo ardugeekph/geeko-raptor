@@ -22,6 +22,9 @@ void GeekoBot::begin(int motorRpm, float wheelDiameter) {
 
 	// Controllers
 	moveStraightPIDController.setConstants(3.00, 0.05, 0.50);
+
+	// Aux
+	buzzer.begin();
 }
 
 
