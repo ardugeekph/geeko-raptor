@@ -159,10 +159,12 @@ void SensorArray::restoreIrCalibration(int* lowest, int *highest, int* contrast)
 
 void SensorArray::readIrCalibrated(int* irVals){
 	int val;
+	int readOrder[8] = {0, 7, 1, 6, 2, 5, 3, 4};
 	for (int i = 0; i < 8; i++) {
-		selectMUXChannel_(i);
+		int idx = readOrder[i];
+		selectMUXChannel_(idx);
 		val = analogRead(IR_MUX_OUTPUT);
-		irVals[i] = (val - lowest_[i]) * float(1024.00/(highest_[i] - lowest_[i]));
+		irVals[idx] = (val - lowest_[idx]) * float(1024.00 / (highest_[idx] - lowest_[idx]));
 	}
 	val = analogRead(IR_BACK_SENSOR);
 	irVals[8] = (val - lowest_[8]) * float(1024.00/(highest_[8] - lowest_[8]));
