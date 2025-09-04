@@ -15,7 +15,7 @@ void MotorController::begin(int motorA, int motorB, int motorPwm, int motorC1, i
 
 		encoder.begin(motorC1, motorC2);
 		encoder.setWheelDiameter(wheelDiameter_);
-		pidController.setConstants(10000, 2000, 4000);
+		pidController.setConstants(3.00, 0.05, 0.50);
 }
 
 
