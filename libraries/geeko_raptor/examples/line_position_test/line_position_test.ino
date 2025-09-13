@@ -1,0 +1,49 @@
+
+#include <GeekoBot.h>
+
+#define MOTOR_RPM 1500
+#define WHEEL_DIAMETER 1.1
+
+GeekoBot robot;
+
+void setup() {
+  Serial.begin(9600);
+
+  robot.begin(MOTOR_RPM, WHEEL_DIAMETER);
+  robot.motorLeft.encoder.attachEncoderInterrupt(leftEncoderISR);
+  robot.motorRight.encoder.attachEncoderInterrupt(rightEncoderISR);
+
+  // robot.calibrateSensors();
+}
+
+void loop() {
+  // Get position
+  int pos = robot.sensor.getPos();
+
+  // Print position
+  Serial.print("Pos: ");
+  Serial.println(pos);
+}
+
+
+void leftEncoderISR() {
+  bool A = digitalRead(L_MOTOR_C1);
+  bool B = digitalRead(L_MOTOR_C2);
+
+  if (A == B) {
+    robot.motorLeft.encoder.decrement();
+  } else {
+    robot.motorLeft.encoder.increment();
+  }
+}
+
+void rightEncoderISR() {
+  bool A = digitalRead(R_MOTOR_C1);
+  bool B = digitalRead(R_MOTOR_C2);
+
+  if (A == B) {
+    robot.motorRight.encoder.increment();
+  } else {
+    robot.motorRight.encoder.decrement();
+  }
+}
