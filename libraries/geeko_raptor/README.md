@@ -84,12 +84,25 @@ float dirDistance = robot.motorLeft.encoder.getDirectionalDistance(); // Get sig
 robot.buzzer.beep(bool on);                        // Turn buzzer on/off
 ```
 
-### PIDController (Internal Usage)
+### **PIDController (For motor correction)**
+
 ```cpp
-// PID is used internally by the library
-// You can access it through motor controllers for advanced control
-robot.motorLeft.pidController.setConstants(kP, kI, kD);
-float output = robot.motorLeft.pidController.output(error);
+
+#include <PIDController.h>
+
+PIDController pid;
+
+void setup() {
+  ...
+  pid.setConstants(kP, kI, kD);
+  ...
+}
+
+void loop() {
+  ...
+  int correction = pid.output(error);
+  ...
+}
 ```
 
 ## Advanced Usage
@@ -109,75 +122,52 @@ robot.motorLeft.encoder.setWheelDiameter(float dia);   // Set wheel diameter
 robot.motorLeft.encoder.reset();                       // Reset encoder count
 ```
 
-### Additional Sensor Functions
-```cpp
-// Direct multiplexer control (low-level)
-void selectMUXChannel(int channel) {
-  digitalWrite(IR_MUX_A, (channel & 0b001) ? HIGH : LOW);
-  digitalWrite(IR_MUX_B, (channel & 0b010) ? HIGH : LOW);
-  digitalWrite(IR_MUX_C, (channel & 0b100) ? HIGH : LOW);
-}
-```
-
-### Hardware Control
-```cpp
-// LED control
-pinMode(LED_LEFT, OUTPUT);
-pinMode(LED_RIGHT, OUTPUT);
-digitalWrite(LED_LEFT, HIGH);
-
-// Manual buzzer control
-digitalWrite(BUZZER_PIN, HIGH);
-
-// IR remote control
-#include <IRremote.h>
-IrReceiver.begin(IR_REMOTE_SENSOR);
-```
-
-## Typical Line Following Pattern
-
-```cpp
-void loop() {
-  robot.update();
-  
-  int position = robot.sensor.getPos();
-  
-  if (robot.sensor.isOut()) {
-    // Handle off-track situation
-    robot.stop();
-  } else {
-    // Calculate motor speeds based on position
-    int baseSpeed = 150;
-    int correction = position / 100;  // Adjust as needed
-    
-    robot.motorLeft.setRpmSpeed(baseSpeed - correction);
-    robot.motorRight.setRpmSpeed(baseSpeed + correction);
-  }
-  
-  // Check for checkpoints
-  if (robot.sensor.isCheckpoint()) {
-    robot.buzzer.beep(true);
-    delay(100);
-    robot.buzzer.beep(false);
-  }
-}
-```
 
 ## Hardware Pin Definitions
 
-### Motor Pins
-- `L_MOTOR_1`, `L_MOTOR_2`, `L_MOTOR_PWM`, `L_MOTOR_C1`, `L_MOTOR_C2` - Left motor
-- `R_MOTOR_1`, `R_MOTOR_2`, `R_MOTOR_PWM`, `R_MOTOR_C1`, `R_MOTOR_C2` - Right motor
+### **LEDs**
+- `LED_LEFT` = 6 (PD6)
+- `LED_RIGHT` = 5 (PD5)
 
-### Sensor Pins
-- `IR_MUX_A`, `IR_MUX_B`, `IR_MUX_C` - Multiplexer control pins
-- `IR_MUX_OUTPUT` - Multiplexer output pin
-- `IR_BACK_SENSOR` - Back IR sensor pin
-- `IR_REMOTE_SENSOR` - IR remote receiver pin
+### **Buzzer**
+- `BUZZER_PIN` = 13 (PB5)
 
-### Other Pins
-- `BUZZER_PIN` - Buzzer control pin
-- `LED_LEFT`, `LED_RIGHT` - Status LED pins
+### **IR Sensors**
+- `IR_BACK_SENSOR` = A7 (ADC7)
+- `IR_MUX_OUTPUT` = A6 (ADC6)
+- `IR_MUX_A` = A3 (ADC3) - Multiplexer control pin A
+- `IR_MUX_B` = A4 (ADC4) - Multiplexer control pin B
+- `IR_MUX_C` = A5 (ADC5) - Multiplexer control pin C
+- `IR_REMOTE_SENSOR` = A2 (ADC2)
+
+### **Left Motor**
+- `L_MOTOR_1` = 8 (PB0)
+- `L_MOTOR_2` = 7 (PD7)
+- `L_MOTOR_PWM` = 9 (PB1)
+
+### **Right Motor**
+- `R_MOTOR_1` = 11 (PB3)
+- `R_MOTOR_2` = 12 (PB4)
+- `R_MOTOR_PWM` = 10 (PB2)
+
+### **Motor Encoders**
+- `L_MOTOR_C1` = 2 (PD2) - Left motor encoder channel 1
+- `L_MOTOR_C2` = A0 (PC0) - Left motor encoder channel 2
+- `R_MOTOR_C1` = 3 (PD3) - Right motor encoder channel 1
+- `R_MOTOR_C2` = A1 (PC1) - Right motor encoder channel 2
+
+### **Board Specifications**
+- **Microcontroller**: ATmega328P-AU SMD
+- **Digital Pins**: 20 total
+- **Analog Inputs**: 6 total (A0-A5)
+- **PWM Pins**: 3, 5, 6, 9, 10, 11
+- **Crystal Frequency**: 16 MHz
+- **Upload Speed**: 115200 baud
+
+### **Special Features**
+- **Interrupt Pins**: 2 (digital pin 2) and 3 (digital pin 3)
+- **SPI Pins**: SS(10), MOSI(11), MISO(12), SCK(13)
+- **I2C Pins**: SDA(A4), SCL(A5)
 
 ## Key Notes
 - Position values range from -3500 (far left) to +3500 (far right)
