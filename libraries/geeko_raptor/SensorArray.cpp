@@ -29,13 +29,15 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
     int counter = 0;
 	int high = 0, low = 1023;
 	bool isCentered = false;
+	bool wasOutside = false;
 
 	while(counter < 4){
 		motorL.encoder.update();
 		motorR.encoder.update();
-		motorL.setRpmSpeed(300, 1, false);
-		motorR.setRpmSpeed(300, 1, true);
+		motorL.setRpmSpeed(150, 1, false);
+		motorR.setRpmSpeed(150, 1, true);
 
+		int current_high = 0, current_low = 1023;
 		int mid_threshold = ((highest_[4] - lowest_[4]) / 2) + lowest_[4];
 		int mid = irVal_[4];
 
@@ -43,26 +45,29 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 		// Serial.print(mid_threshold);
 		// Serial.print("\tMid: ");
 		// Serial.print(mid);
+		// Serial.print("\twasOutside: ");
+		// Serial.print(wasOutside);
 		// Serial.print("\tCounter: ");
 		// Serial.println(counter);
-		
-		if (mid > mid_threshold && !isCentered) {
-			isCentered = true;
-			counter++;
-		} else if (mid < mid_threshold && isCentered) {
-			isCentered = false;
-		}
 
 		readIrRaw(irVal_);
 		for(int i = 0; i < 9; i++){
 			if(irVal_[i] > high) high = irVal_[i];
 			if(irVal_[i] < low) low = irVal_[i];
+			if(irVal_[i] > current_high) current_high = irVal_[i];
+			if(irVal_[i] < current_low) current_low = irVal_[i];
 			if(irVal_[i] > highest_[i]) highest_[i] = irVal_[i];
 			if(irVal_[i] < lowest_[i]) lowest_[i] = irVal_[i];
 		}
-	}
+		contrast_ = high - low;
 
-	contrast_ = high - low;
+		if (mid > mid_threshold && wasOutside && contrast_ > 200) {
+			counter++;
+			wasOutside = false;
+		} else if (!wasOutside) {
+			if(current_high-current_low < contrast_/2) wasOutside = true;
+		}
+	}
 
 	motorL.stop();
 	motorR.stop();

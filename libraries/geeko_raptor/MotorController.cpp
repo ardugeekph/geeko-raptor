@@ -15,7 +15,7 @@ void MotorController::begin(int motorA, int motorB, int motorPwm, int motorC1, i
 
 		encoder.begin(motorC1, motorC2);
 		encoder.setWheelDiameter(wheelDiameter_);
-		pidController.setConstants(3.00, 0.05, 0.50);
+		pidController.setConstants(2.00, 0.05, 0.25);
 }
 
 
@@ -39,8 +39,8 @@ void MotorController::setRpmSpeed(float targetRPM, float accel, bool reverse) {
 	targetRPM = abs(targetRPM);
 
     unsigned long now = millis();
-    float deltaT = (now - lastUpdate) / 1000.0;
-    if (deltaT < 0.1) return;  // prevent over-updating
+    float deltaT = now - lastUpdate;
+    if (deltaT < 50) return;  // prevent over-updating
     lastUpdate = now;
 
     // Convert acceleration m/s^2 → RPM per loop interval
