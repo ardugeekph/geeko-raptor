@@ -7,6 +7,7 @@
  */
 
 #include <GeekoBot.h>
+#include <IRremote.h>
 #include <RouteRunner.h>
 
 #define MOTOR_RPM 1500
@@ -18,6 +19,9 @@ RouteRunner runner;
 // Bit i = front sensor i (0 = leftmost, 7 = rightmost on 8 MUX); bit 8 = back.
 // Example: both outer front sensors over line (high calibrated reading).
 static const uint16_t kOuterLineMask = (1u << 0) | (1u << 7);
+static const uint32_t IR_KEY_0 = 0xFF6897;
+static const uint32_t IR_KEY_1 = 0xFF30CF;
+static const uint32_t IR_KEY_2 = 0xFF18E7;
 
 // RouteStep shape is explicit: Trigger, Action, SpeedA, SpeedB.
 // SpeedA/SpeedB are line-follow segments after Action.
@@ -47,6 +51,7 @@ void setup() {
 	robot.begin(MOTOR_RPM, WHEEL_DIAMETER);
 	robot.motorLeft.encoder.attachEncoderInterrupt(leftEncoderISR);
 	robot.motorRight.encoder.attachEncoderInterrupt(rightEncoderISR);
+	IrReceiver.begin(IR_REMOTE_SENSOR);
 
 	// robot.calibrateSensors();
 
@@ -54,6 +59,23 @@ void setup() {
 }
 
 void loop() {
+	if (IrReceiver.decode()) {
+		const uint32_t code = IrReceiver.decodedIRData.decodedRawData;
+		int targetIndex = -1;
+		if (code == IR_KEY_0) targetIndex = 0;
+		else if (code == IR_KEY_1) targetIndex = 1;
+		else if (code == IR_KEY_2) targetIndex = 2;
+
+		if (targetIndex >= 0) {
+			const bool ok = runner.setIndex((uint16_t)targetIndex, robot);
+			Serial.print(F("IR resume to idx "));
+			Serial.print(targetIndex);
+			Serial.print(F(" -> "));
+			Serial.println(ok ? F("OK") : F("INVALID"));
+		}
+		IrReceiver.resume();
+	}
+
 	robot.update();
 	runner.tick(robot);
 

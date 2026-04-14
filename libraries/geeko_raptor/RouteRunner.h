@@ -107,6 +107,9 @@ public:
 	void begin(const RouteStep* plan, uint16_t count);
 	void tick(GeekoBot& robot);
 	void reset();
+	bool setIndex(uint16_t index, GeekoBot& robot);
+	void restartFromIndex(uint16_t index, GeekoBot& robot);
+	uint16_t stepCount() const { return count_; }
 	void setActionForwardControl(float kp, int16_t maxCorrection);
 	void setLineFollowTunings(float kp, float ki, float kd);
 	void setLineFollowCorrectionLimit(int16_t maxCorrection);

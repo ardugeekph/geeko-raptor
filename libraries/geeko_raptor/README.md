@@ -63,8 +63,31 @@ void loop() {
 - **SpeedA / SpeedB:** after `Action` ends, runner automatically enters line-follow mode and applies SpeedA then SpeedB as base speeds until each stop condition is met.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** tune with `runner.setLineFollowTunings(kp, ki, kd)` and `runner.setLineFollowCorrectionLimit(maxCorrection)`.
+- **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
 See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.
+
+### Resume from index (IR in sketch layer)
+
+Keep IR decoding in your sketch/app code, then call the runner resume API:
+
+```cpp
+#include <IRremote.h>
+IrReceiver.begin(IR_REMOTE_SENSOR);
+
+if (IrReceiver.decode()) {
+  uint32_t code = IrReceiver.decodedIRData.decodedRawData;
+  int target = -1;
+  if (code == 0xFF6897) target = 0; // key 0
+  else if (code == 0xFF30CF) target = 1; // key 1
+  else if (code == 0xFF18E7) target = 2; // key 2
+
+  if (target >= 0) {
+    runner.setIndex((uint16_t)target, robot);
+  }
+  IrReceiver.resume();
+}
+```
 
 ## Essential Functions
 

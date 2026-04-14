@@ -18,6 +18,24 @@ void RouteRunner::reset() {
 	begin(plan_, count_);
 }
 
+bool RouteRunner::setIndex(uint16_t index, GeekoBot& robot) {
+	if (index >= count_ || plan_ == nullptr) {
+		return false;
+	}
+
+	index_ = index;
+	segmentStartMs_ = 0;
+	segmentDistBaseline_ = 0.f;
+	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
+	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+	enterWaitingTrigger_(robot);
+	return true;
+}
+
+void RouteRunner::restartFromIndex(uint16_t index, GeekoBot& robot) {
+	(void)setIndex(index, robot);
+}
+
 void RouteRunner::setActionForwardControl(float kp, int16_t maxCorrection) {
 	actionForwardKp_ = kp;
 	maxActionForwardCorrection_ = maxCorrection;
