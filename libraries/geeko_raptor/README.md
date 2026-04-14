@@ -17,6 +17,55 @@ void loop() {
 }
 ```
 
+## RouteRunner (declarative routes)
+
+Define a table of `RouteStep` entries using an explicit 4-item schema:
+`Trigger -> Action -> SpeedA -> SpeedB`.
+The library runs a non-blocking state machine; your sketch only calls `update` then `tick`.
+
+**Contract:** call `GeekoBot::update()` **before** `RouteRunner::tick(robot)` every `loop()` iteration. `tick()` does not update encoders for you.
+
+```cpp
+#include <GeekoBot.h>
+#include <RouteRunner.h>
+
+GeekoBot robot;
+RouteRunner runner;
+
+const RouteStep PLAN[] = {
+  makeStep(
+    makeDistanceTrigger(0.f),
+    makeActionTurnLeft(110, stopByTime(180)),
+    makeSpeedSegment(130, stopByTime(900)),
+    makeSpeedSegment(90, stopByDistance(2.0f))
+  ),
+};
+
+void setup() {
+  robot.begin(1500, 1.1);
+  robot.motorLeft.encoder.attachEncoderInterrupt(leftEncoderISR);
+  robot.motorRight.encoder.attachEncoderInterrupt(rightEncoderISR);
+  runner.begin(PLAN, sizeof(PLAN) / sizeof(PLAN[0]));
+}
+
+void loop() {
+  robot.update();
+  runner.tick(robot);
+}
+```
+
+### Behaviour summary
+
+- **While waiting for a trigger:** both motors are **stopped**. Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started; if the robot does not move, use a **line** trigger or `makeDistanceTrigger(0.f)` for an immediate step.
+- **Line trigger:** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires.
+- **Stop conditions (shared):** use `stopByTime(ms)` or `stopByDistance(inches)` for both `Action` and `Speed` segments.
+- **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`.
+- **SpeedA / SpeedB:** after `Action` ends, runner automatically enters line-follow mode and applies SpeedA then SpeedB as base speeds until each stop condition is met.
+- **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
+- **Line-follow tuning:** tune with `runner.setLineFollowTunings(kp, ki, kd)` and `runner.setLineFollowCorrectionLimit(maxCorrection)`.
+
+See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.
+
 ## Essential Functions
 
 ### GeekoBot (`robot`)
