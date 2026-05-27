@@ -178,7 +178,8 @@ void SensorArray::readIrCalibrated(int* irVals){
 	int raw[9];
 	readIrRaw(raw);
 	for (int i = 0; i < 9; i++) {
-		irVals[i] = (raw[i] - lowest_[i]) * float(1024.00 / (highest_[i] - lowest_[i]));
+		int calibrated = (raw[i] - lowest_[i]) * float(1024.00 / (highest_[i] - lowest_[i]));
+		irVals[i] = abs(calibrated);
 	}
 }
 
