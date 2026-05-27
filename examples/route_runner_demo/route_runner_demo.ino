@@ -19,6 +19,8 @@ RouteRunner runner;
 // Bit i = front sensor i (0 = leftmost, 7 = rightmost on 8 MUX); bit 8 = back.
 // Example: both outer front sensors over line (high calibrated reading).
 static const uint16_t kOuterLineMask = (1u << 0) | (1u << 7);
+// Front sensors 1, 2, 3 all on black line (calibrated reading >= lineThreshold).
+static const uint16_t kLineMask123 = (1u << 1) | (1u << 2) | (1u << 3);
 static const uint32_t IR_KEY_0 = 0xFF6897;
 static const uint32_t IR_KEY_1 = 0xFF30CF;
 static const uint32_t IR_KEY_2 = 0xFF18E7;
@@ -33,7 +35,7 @@ const RouteStep PLAN[] = {
 		makeSpeedSegment(90, stopByDistance(2.0f))
 	),
 	makeStep(
-		makeLineTrigger(kOuterLineMask, 450),
+		makeLineTrigger(kLineMask123, 450),
 		makeActionForward(120, stopByTime(120)),
 		makeSpeedSegment(140, stopByTime(1200)),
 		makeSpeedSegment(95, stopByTime(500))

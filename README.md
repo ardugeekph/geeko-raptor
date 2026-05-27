@@ -58,9 +58,10 @@ void loop() {
 
 - **While waiting for a trigger:** both motors are **stopped**. Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started; if the robot does not move, use a **line** trigger or `makeDistanceTrigger(0.f)` for an immediate step.
 - **Line trigger:** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires.
-- **Stop conditions (shared):** use `stopByTime(ms)` or `stopByDistance(inches)` for both `Action` and `Speed` segments.
+- **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
+- **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between.
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`.
-- **SpeedA / SpeedB:** after `Action` ends, runner automatically enters line-follow mode and applies SpeedA then SpeedB as base speeds until each stop condition is met.
+- **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then SpeedB. If SpeedA uses until-next-trigger, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** tune with `runner.setLineFollowTunings(kp, ki, kd)` and `runner.setLineFollowCorrectionLimit(maxCorrection)`.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.

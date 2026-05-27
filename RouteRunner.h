@@ -3,9 +3,10 @@
 
 #include <Arduino.h>
 #include "GeekoBot.h"
+#include "PIDController.h"
 
 enum class RouteActionKind : uint8_t { Forward, Backward, TurnLeft, TurnRight };
-enum class StopKind : uint8_t { ByTime, ByDistance };
+enum class StopKind : uint8_t { ByTime, ByDistance, UntilNextTrigger };
 enum class TriggerKind : uint8_t { LineMask, DistanceTravelled };
 
 struct StopCondition {
@@ -49,6 +50,11 @@ inline StopCondition stopByDistance(float inches) {
 	return stop;
 }
 
+inline StopCondition stopUntilNextTrigger() {
+	StopCondition stop = {StopKind::UntilNextTrigger, 0, 0.f};
+	return stop;
+}
+
 inline RouteTrigger makeLineTrigger(uint16_t sensorMask, uint16_t lineThreshold) {
 	RouteTrigger t = {TriggerKind::LineMask, sensorMask, lineThreshold, 0.f};
 	return t;
@@ -77,6 +83,11 @@ inline RouteActionA makeActionTurnLeft(int16_t speed, const StopCondition& stop)
 inline RouteActionA makeActionTurnRight(int16_t speed, const StopCondition& stop) {
 	RouteActionA a = {RouteActionKind::TurnRight, speed, stop};
 	return a;
+}
+
+inline RouteSpeedSegment makeSpeedSegment(int16_t speed) {
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger()};
+	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(int16_t speed, const StopCondition& stop) {
@@ -123,7 +134,12 @@ private:
 	static bool lineTriggerFired_(const RouteTrigger& tr, int irVals[9]);
 	static bool distanceTriggerFired_(const RouteTrigger& tr, float baseline, GeekoBot& robot);
 	static bool stopIsNoOp_(const StopCondition& stop);
+	static bool stopIsUntilNextTrigger_(const StopCondition& stop);
 	static bool stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
+
+	bool nextStepTriggerFired_(GeekoBot& robot);
+	bool speedSegmentDone_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
+	void advanceToNextStepAction_(GeekoBot& robot);
 
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void startSegment_(GeekoBot& robot);
@@ -149,10 +165,10 @@ private:
 	float lineFollowKp_ = 0.15f;
 	float lineFollowKi_ = 0.0f;
 	float lineFollowKd_ = 0.15f;
-	float lineFollowIntegral_ = 0.0f;
-	float lineFollowLastError_ = 0.0f;
-	unsigned long lineFollowLastUpdateMs_ = 0;
 	int16_t maxLineFollowCorrection_ = 120;
+
+	PIDController lineFollowPid_;
+	PIDController actionForwardPid_;
 
 	int irVals_[9];
 };

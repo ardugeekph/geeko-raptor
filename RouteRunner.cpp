@@ -9,9 +9,10 @@ void RouteRunner::begin(const RouteStep* plan, uint16_t count) {
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
 	rearmTriggerBaseline_ = true;
-	lineFollowIntegral_ = 0.0f;
-	lineFollowLastError_ = 0.0f;
-	lineFollowLastUpdateMs_ = 0;
+	lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
+	actionForwardPid_.setConstants(actionForwardKp_, 0.0f, 0.0f);
+	lineFollowPid_.reset();
+	actionForwardPid_.reset();
 }
 
 void RouteRunner::reset() {
@@ -39,12 +40,14 @@ void RouteRunner::restartFromIndex(uint16_t index, GeekoBot& robot) {
 void RouteRunner::setActionForwardControl(float kp, int16_t maxCorrection) {
 	actionForwardKp_ = kp;
 	maxActionForwardCorrection_ = maxCorrection;
+	actionForwardPid_.setConstants(kp, 0.0f, 0.0f);
 }
 
 void RouteRunner::setLineFollowTunings(float kp, float ki, float kd) {
 	lineFollowKp_ = kp;
 	lineFollowKi_ = ki;
 	lineFollowKd_ = kd;
+	lineFollowPid_.setConstants(kp, ki, kd);
 }
 
 void RouteRunner::setLineFollowCorrectionLimit(int16_t maxCorrection) {
@@ -79,10 +82,61 @@ bool RouteRunner::distanceTriggerFired_(const RouteTrigger& tr, float baseline, 
 }
 
 bool RouteRunner::stopIsNoOp_(const StopCondition& stop) {
+	if (stop.kind == StopKind::UntilNextTrigger) {
+		return false;
+	}
 	if (stop.kind == StopKind::ByTime) {
 		return stop.timeMs == 0;
 	}
 	return stop.distanceInches <= 0.f;
+}
+
+bool RouteRunner::stopIsUntilNextTrigger_(const StopCondition& stop) {
+	return stop.kind == StopKind::UntilNextTrigger;
+}
+
+bool RouteRunner::nextStepTriggerFired_(GeekoBot& robot) {
+	if (index_ + 1 >= count_ || plan_ == nullptr) {
+		return false;
+	}
+
+	const RouteTrigger& tr = plan_[index_ + 1].trigger;
+	if (tr.kind == TriggerKind::LineMask) {
+		robot.sensor.readIrCalibrated(irVals_);
+		return lineTriggerFired_(tr, irVals_);
+	}
+	if (tr.kind == TriggerKind::DistanceTravelled) {
+		return distanceTriggerFired_(tr, triggerDistBaseline_, robot);
+	}
+	return false;
+}
+
+bool RouteRunner::speedSegmentDone_(
+	const StopCondition& stop,
+	unsigned long startMs,
+	float startDist,
+	GeekoBot& robot
+) {
+	if (stopIsUntilNextTrigger_(stop)) {
+		return nextStepTriggerFired_(robot);
+	}
+	return stopIsNoOp_(stop) || stopSatisfied_(stop, startMs, startDist, robot);
+}
+
+void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
+	index_++;
+	if (index_ >= count_) {
+		state_ = RouteRunnerState::Finished;
+		robot.stop();
+		return;
+	}
+
+	triggerDistBaseline_ = maxWheelDistance_(robot);
+	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
+	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+	startSegment_(robot);
+	lineFollowPid_.reset();
+	state_ = RouteRunnerState::RunningAction;
 }
 
 bool RouteRunner::stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot) {
@@ -96,9 +150,8 @@ void RouteRunner::enterWaitingTrigger_(GeekoBot& robot) {
 	state_ = RouteRunnerState::WaitingTrigger;
 	rearmTriggerBaseline_ = true;
 	robot.stop();
-	lineFollowIntegral_ = 0.0f;
-	lineFollowLastError_ = 0.0f;
-	lineFollowLastUpdateMs_ = millis();
+	lineFollowPid_.reset();
+	actionForwardPid_.reset();
 }
 
 void RouteRunner::startSegment_(GeekoBot& robot) {
@@ -113,7 +166,7 @@ void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSp
 	const float deltaR = currentR - actionDistBaselineR_;
 	const float error = deltaL - deltaR;
 
-	int correction = (int)(error * actionForwardKp_);
+	int correction = (int)actionForwardPid_.output(error);
 	if (correction > maxActionForwardCorrection_) correction = maxActionForwardCorrection_;
 	if (correction < -maxActionForwardCorrection_) correction = -maxActionForwardCorrection_;
 
@@ -129,18 +182,8 @@ void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSp
 }
 
 void RouteRunner::applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed) {
-	unsigned long now = millis();
-	float dt = (lineFollowLastUpdateMs_ == 0) ? 0.02f : ((now - lineFollowLastUpdateMs_) / 1000.0f);
-	if (dt <= 0.0f) dt = 0.02f;
-	lineFollowLastUpdateMs_ = now;
-
-	float error = (float)robot.sensor.getPos();
-	lineFollowIntegral_ += error * dt;
-	const float derivative = (error - lineFollowLastError_) / dt;
-	lineFollowLastError_ = error;
-
-	float output = (lineFollowKp_ * error) + (lineFollowKi_ * lineFollowIntegral_) + (lineFollowKd_ * derivative);
-	int correction = (int)output;
+	const float error = (float)robot.sensor.getPos();
+	int correction = (int)lineFollowPid_.output(error);
 	if (correction > maxLineFollowCorrection_) correction = maxLineFollowCorrection_;
 	if (correction < -maxLineFollowCorrection_) correction = -maxLineFollowCorrection_;
 
@@ -246,9 +289,10 @@ void RouteRunner::tick(GeekoBot& robot) {
 		case RouteRunnerState::RunningSpeedA: {
 			applyLineFollowTick_(robot, step.speedA.speed);
 
-			if (stopIsNoOp_(step.speedA.stop) ||
-				stopSatisfied_(step.speedA.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
-				if (stopIsNoOp_(step.speedB.stop)) {
+			if (speedSegmentDone_(step.speedA.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
+				if (stopIsUntilNextTrigger_(step.speedA.stop)) {
+					advanceToNextStepAction_(robot);
+				} else if (stopIsNoOp_(step.speedB.stop)) {
 					index_++;
 					if (index_ >= count_) {
 						state_ = RouteRunnerState::Finished;
@@ -267,14 +311,17 @@ void RouteRunner::tick(GeekoBot& robot) {
 		case RouteRunnerState::RunningSpeedB: {
 			applyLineFollowTick_(robot, step.speedB.speed);
 
-			if (stopIsNoOp_(step.speedB.stop) ||
-				stopSatisfied_(step.speedB.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
-				index_++;
-				if (index_ >= count_) {
-					state_ = RouteRunnerState::Finished;
-					robot.stop();
+			if (speedSegmentDone_(step.speedB.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
+				if (stopIsUntilNextTrigger_(step.speedB.stop)) {
+					advanceToNextStepAction_(robot);
 				} else {
-					enterWaitingTrigger_(robot);
+					index_++;
+					if (index_ >= count_) {
+						state_ = RouteRunnerState::Finished;
+						robot.stop();
+					} else {
+						enterWaitingTrigger_(robot);
+					}
 				}
 			}
 			break;
