@@ -80,13 +80,15 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 void SensorArray::readIrRaw(int* irVals){
 	for (int i = 0; i < 8; i++) {
 		selectMUXChannel_(i);
-		irVals[i] = analogRead(IR_MUX_OUTPUT);
-		// Serial.print(IR_val[i]);
-		// Serial.print("  ");
+		irVals[i] = readAveragedAdc_(IR_MUX_OUTPUT);
 	}
-	irVals[8] = analogRead(IR_BACK_SENSOR);
-	// Serial.print(IR_val[8]);
-	// Serial.println("  ");
+	irVals[8] = readAveragedAdc_(IR_BACK_SENSOR);
+}
+
+
+int SensorArray::readAveragedAdc_(uint8_t pin) {
+	analogRead(pin);
+	return (analogRead(pin) + analogRead(pin)) / 2;
 }
 
 
@@ -173,16 +175,11 @@ void SensorArray::restoreIrCalibration(int* lowest, int *highest, int* contrast)
 }
 
 void SensorArray::readIrCalibrated(int* irVals){
-	int val;
-	int readOrder[8] = {0, 7, 1, 6, 2, 5, 3, 4};
-	for (int i = 0; i < 8; i++) {
-		int idx = readOrder[i];
-		selectMUXChannel_(idx);
-		val = analogRead(IR_MUX_OUTPUT);
-		irVals[idx] = (val - lowest_[idx]) * float(1024.00 / (highest_[idx] - lowest_[idx]));
+	int raw[9];
+	readIrRaw(raw);
+	for (int i = 0; i < 9; i++) {
+		irVals[i] = (raw[i] - lowest_[i]) * float(1024.00 / (highest_[i] - lowest_[i]));
 	}
-	val = analogRead(IR_BACK_SENSOR);
-	irVals[8] = (val - lowest_[8]) * float(1024.00/(highest_[8] - lowest_[8]));
 }
 
 

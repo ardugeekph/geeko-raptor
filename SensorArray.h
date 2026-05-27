@@ -20,6 +20,7 @@ class SensorArray {
 		int irVal_[9];
 
 		void selectMUXChannel_(int channel);
+		int readAveragedAdc_(uint8_t pin);
 
 
 		int SCAN_TIME = 800;
