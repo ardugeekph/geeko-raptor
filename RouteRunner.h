@@ -123,7 +123,6 @@ public:
 	uint16_t stepCount() const { return count_; }
 	void setActionForwardControl(float kp, int16_t maxCorrection);
 	void setLineFollowTunings(float kp, float ki, float kd);
-	void setLineFollowCorrectionLimit(int16_t maxCorrection);
 
 	bool finished() const { return state_ == RouteRunnerState::Finished; }
 	uint16_t currentIndex() const { return index_; }
@@ -162,10 +161,9 @@ private:
 	float actionForwardKp_ = 8.0f;
 	int16_t maxActionForwardCorrection_ = 40;
 
-	float lineFollowKp_ = 0.15f;
+	float lineFollowKp_ = 0.09f;
 	float lineFollowKi_ = 0.0f;
-	float lineFollowKd_ = 0.15f;
-	int16_t maxLineFollowCorrection_ = 120;
+	float lineFollowKd_ = 0.1f;
 
 	PIDController lineFollowPid_;
 	PIDController actionForwardPid_;

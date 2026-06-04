@@ -50,10 +50,6 @@ void RouteRunner::setLineFollowTunings(float kp, float ki, float kd) {
 	lineFollowPid_.setConstants(kp, ki, kd);
 }
 
-void RouteRunner::setLineFollowCorrectionLimit(int16_t maxCorrection) {
-	maxLineFollowCorrection_ = maxCorrection;
-}
-
 float RouteRunner::maxWheelDistance_(GeekoBot& robot) {
 	float dl = robot.motorLeft.encoder.getDistance();
 	float dr = robot.motorRight.encoder.getDistance();
@@ -184,8 +180,6 @@ void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSp
 void RouteRunner::applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed) {
 	const float error = (float)robot.sensor.getPos();
 	int correction = (int)lineFollowPid_.output(error);
-	if (correction > maxLineFollowCorrection_) correction = maxLineFollowCorrection_;
-	if (correction < -maxLineFollowCorrection_) correction = -maxLineFollowCorrection_;
 
 	int left = (int)baseSpeed + correction;
 	int right = (int)baseSpeed - correction;
