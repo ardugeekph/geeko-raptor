@@ -34,8 +34,8 @@ RouteRunner runner;
 
 const RouteStep PLAN[] = {
   makeStep(
-    makeDistanceTrigger(0.f),
-    makeActionTurnLeft(110, stopByTime(180)),
+    makeNoTrigger(),
+    makeNoAction(),
     makeSpeedSegment(130, stopByTime(900)),
     makeSpeedSegment(90, stopByDistance(2.0f))
   ),
@@ -56,11 +56,11 @@ void loop() {
 
 ### Behaviour summary
 
-- **While waiting for a trigger:** both motors are **stopped**. Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started; if the robot does not move, use a **line** trigger or `makeDistanceTrigger(0.f)` for an immediate step.
+- **While waiting for a trigger:** both motors are **stopped**. Use `makeNoTrigger()` to skip waiting and start the step immediately (useful for the first step). Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started.
 - **Line trigger:** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires.
 - **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
 - **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between.
-- **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`.
+- **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
 - **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then SpeedB. If SpeedA uses until-next-trigger, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** tune with `runner.setLineFollowTunings(kp, ki, kd)`.

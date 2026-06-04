@@ -1,7 +1,7 @@
 /**
  * RouteRunner demo: define a const RouteStep[] plan and call runner.tick(robot)
- * after robot.update() each loop. Motors are stopped while waiting for a trigger
- * (except distance trigger 0, which fires immediately — useful for dry runs).
+ * after robot.update() each loop. Motors are stopped while waiting for a trigger.
+ * Use makeNoTrigger() + makeNoAction() on the first step to start line-follow immediately.
  *
  * Calibrate sensors for LineMask triggers; tune lineThreshold for your surface.
  */
@@ -29,8 +29,8 @@ static const uint32_t IR_KEY_2 = 0xFF18E7;
 // SpeedA/SpeedB are line-follow segments after Action.
 const RouteStep PLAN[] = {
 	makeStep(
-		makeDistanceTrigger(0.f),
-		makeActionTurnLeft(110, stopByTime(180)),
+		makeNoTrigger(),
+		makeNoAction(),
 		makeSpeedSegment(130, stopByTime(900)),
 		makeSpeedSegment(90, stopByDistance(2.0f))
 	),

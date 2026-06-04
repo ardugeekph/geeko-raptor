@@ -97,6 +97,9 @@ bool RouteRunner::nextStepTriggerFired_(GeekoBot& robot) {
 	}
 
 	const RouteTrigger& tr = plan_[index_ + 1].trigger;
+	if (tr.kind == TriggerKind::None) {
+		return true;
+	}
 	if (tr.kind == TriggerKind::LineMask) {
 		robot.sensor.readIrCalibrated(irVals_);
 		return lineTriggerFired_(tr, irVals_);
@@ -128,6 +131,12 @@ void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
 	}
 
 	triggerDistBaseline_ = maxWheelDistance_(robot);
+	const RouteStep& step = plan_[index_];
+	if (step.action.kind == RouteActionKind::None) {
+		skipActionAndBeginSpeedSegments_(robot, step);
+		return;
+	}
+
 	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
 	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
 	startSegment_(robot);
@@ -148,6 +157,26 @@ void RouteRunner::enterWaitingTrigger_(GeekoBot& robot) {
 	robot.stop();
 	lineFollowPid_.reset();
 	actionForwardPid_.reset();
+}
+
+void RouteRunner::skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step) {
+	if (stopIsNoOp_(step.speedA.stop)) {
+		if (stopIsNoOp_(step.speedB.stop)) {
+			index_++;
+			if (index_ >= count_) {
+				state_ = RouteRunnerState::Finished;
+				robot.stop();
+			} else {
+				enterWaitingTrigger_(robot);
+			}
+		} else {
+			startSegment_(robot);
+			state_ = RouteRunnerState::RunningSpeedB;
+		}
+	} else {
+		startSegment_(robot);
+		state_ = RouteRunnerState::RunningSpeedA;
+	}
 }
 
 void RouteRunner::startSegment_(GeekoBot& robot) {
@@ -196,6 +225,9 @@ void RouteRunner::applyActionATick_(GeekoBot& robot, const RouteActionA& action)
 	const int speedMag = abs((int)action.speed);
 
 	switch (action.kind) {
+		case RouteActionKind::None:
+			robot.stop();
+			break;
 		case RouteActionKind::TurnLeft:
 			robot.motorLeft.setSpeed(-speedMag);
 			robot.motorRight.setSpeed(speedMag);
@@ -240,42 +272,37 @@ void RouteRunner::tick(GeekoBot& robot) {
 			}
 
 			bool fired = false;
-			if (step.trigger.kind == TriggerKind::LineMask) {
+			if (step.trigger.kind == TriggerKind::None) {
+				fired = true;
+			} else if (step.trigger.kind == TriggerKind::LineMask) {
 				fired = lineTriggerFired_(step.trigger, irVals_);
 			} else if (step.trigger.kind == TriggerKind::DistanceTravelled) {
 				fired = distanceTriggerFired_(step.trigger, triggerDistBaseline_, robot);
 			}
 
 			if (fired) {
-				actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
-				actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
-				startSegment_(robot);
-				state_ = RouteRunnerState::RunningAction;
+				if (step.action.kind == RouteActionKind::None) {
+					skipActionAndBeginSpeedSegments_(robot, step);
+				} else {
+					actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
+					actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+					startSegment_(robot);
+					state_ = RouteRunnerState::RunningAction;
+				}
 			}
 			break;
 		}
 
 		case RouteRunnerState::RunningAction: {
+			if (step.action.kind == RouteActionKind::None) {
+				skipActionAndBeginSpeedSegments_(robot, step);
+				break;
+			}
+
 			applyActionATick_(robot, step.action);
 			if (stopIsNoOp_(step.action.stop) ||
 				stopSatisfied_(step.action.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
-				if (stopIsNoOp_(step.speedA.stop)) {
-					if (stopIsNoOp_(step.speedB.stop)) {
-						index_++;
-						if (index_ >= count_) {
-							state_ = RouteRunnerState::Finished;
-							robot.stop();
-						} else {
-							enterWaitingTrigger_(robot);
-						}
-					} else {
-						startSegment_(robot);
-						state_ = RouteRunnerState::RunningSpeedB;
-					}
-				} else {
-					startSegment_(robot);
-					state_ = RouteRunnerState::RunningSpeedA;
-				}
+				skipActionAndBeginSpeedSegments_(robot, step);
 			}
 			break;
 		}

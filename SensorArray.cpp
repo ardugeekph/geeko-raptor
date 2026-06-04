@@ -80,16 +80,11 @@ void SensorArray::calibrate(MotorController& motorL, MotorController& motorR) {
 void SensorArray::readIrRaw(int* irVals){
 	for (int i = 0; i < 8; i++) {
 		selectMUXChannel_(i);
-		irVals[i] = readAveragedAdc_(IR_MUX_OUTPUT);
+		irVals[i] = analogRead(IR_MUX_OUTPUT);
 	}
-	irVals[8] = readAveragedAdc_(IR_BACK_SENSOR);
+	irVals[8] = analogRead(IR_BACK_SENSOR);
 }
 
-
-int SensorArray::readAveragedAdc_(uint8_t pin) {
-	analogRead(pin);
-	return (analogRead(pin) + analogRead(pin)) / 2;
-}
 
 
 void SensorArray::selectMUXChannel_(int channel) {

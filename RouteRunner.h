@@ -5,9 +5,9 @@
 #include "GeekoBot.h"
 #include "PIDController.h"
 
-enum class RouteActionKind : uint8_t { Forward, Backward, TurnLeft, TurnRight };
+enum class RouteActionKind : uint8_t { None, Forward, Backward, TurnLeft, TurnRight };
 enum class StopKind : uint8_t { ByTime, ByDistance, UntilNextTrigger };
-enum class TriggerKind : uint8_t { LineMask, DistanceTravelled };
+enum class TriggerKind : uint8_t { None, LineMask, DistanceTravelled };
 
 struct StopCondition {
 	StopKind kind;
@@ -55,6 +55,11 @@ inline StopCondition stopUntilNextTrigger() {
 	return stop;
 }
 
+inline RouteTrigger makeNoTrigger() {
+	RouteTrigger t = {TriggerKind::None, 0, 0, 0.f};
+	return t;
+}
+
 inline RouteTrigger makeLineTrigger(uint16_t sensorMask, uint16_t lineThreshold) {
 	RouteTrigger t = {TriggerKind::LineMask, sensorMask, lineThreshold, 0.f};
 	return t;
@@ -63,6 +68,11 @@ inline RouteTrigger makeLineTrigger(uint16_t sensorMask, uint16_t lineThreshold)
 inline RouteTrigger makeDistanceTrigger(float travelInches) {
 	RouteTrigger t = {TriggerKind::DistanceTravelled, 0, 0, travelInches};
 	return t;
+}
+
+inline RouteActionA makeNoAction() {
+	RouteActionA a = {RouteActionKind::None, 0, stopByTime(0)};
+	return a;
 }
 
 inline RouteActionA makeActionForward(int16_t speed, const StopCondition& stop) {
@@ -141,6 +151,7 @@ private:
 	void advanceToNextStepAction_(GeekoBot& robot);
 
 	void enterWaitingTrigger_(GeekoBot& robot);
+	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);
 	void startSegment_(GeekoBot& robot);
 	void applyActionATick_(GeekoBot& robot, const RouteActionA& action);
 	void applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSpeed);
@@ -163,7 +174,7 @@ private:
 
 	float lineFollowKp_ = 0.09f;
 	float lineFollowKi_ = 0.0f;
-	float lineFollowKd_ = 0.1f;
+	float lineFollowKd_ = 0.12f;
 
 	PIDController lineFollowPid_;
 	PIDController actionForwardPid_;
