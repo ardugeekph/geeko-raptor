@@ -172,9 +172,9 @@ private:
 	float actionForwardKp_ = 8.0f;
 	int16_t maxActionForwardCorrection_ = 40;
 
-	float lineFollowKp_ = 0.09f;
+	float lineFollowKp_ = 0.13f;
 	float lineFollowKi_ = 0.0f;
-	float lineFollowKd_ = 0.12f;
+	float lineFollowKd_ = 0.15f;
 
 	PIDController lineFollowPid_;
 	PIDController actionForwardPid_;
