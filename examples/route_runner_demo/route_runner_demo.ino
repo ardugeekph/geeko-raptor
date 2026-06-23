@@ -37,7 +37,7 @@ const RouteStep PLAN[] = {
 	makeStep(
 		makeLineTrigger(kLineMask123, 450),
 		makeActionForward(120, stopByTime(120)),
-		makeSpeedSegment(140, stopByTime(1200)),
+		makeSpeedSegment(140, stopByTime(1200), lineFollowPID(0.13f, 0.0f, 0.15f)),
 		makeSpeedSegment(95, stopByTime(500))
 	),
 	makeStep(

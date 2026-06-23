@@ -63,7 +63,7 @@ void loop() {
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
 - **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then SpeedB. If SpeedA uses until-next-trigger, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
-- **Line-follow tuning:** tune with `runner.setLineFollowTunings(kp, ki, kd)`.
+- **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the third argument to `makeSpeedSegment(...)`. Segments without `lineFollowPID(...)` use the runner defaults.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
 See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.

@@ -28,9 +28,17 @@ struct RouteActionA {
 	StopCondition stop;
 };
 
+struct LineFollowPID {
+	float kp;
+	float ki;
+	float kd;
+	bool custom;
+};
+
 struct RouteSpeedSegment {
 	int16_t speed;
 	StopCondition stop;
+	LineFollowPID lineFollowPid;
 };
 
 struct RouteStep {
@@ -95,13 +103,32 @@ inline RouteActionA makeActionTurnRight(int16_t speed, const StopCondition& stop
 	return a;
 }
 
+inline LineFollowPID defaultLineFollowPID() {
+	LineFollowPID pid = {0.f, 0.f, 0.f, false};
+	return pid;
+}
+
+inline LineFollowPID lineFollowPID(float kp, float ki, float kd) {
+	LineFollowPID pid = {kp, ki, kd, true};
+	return pid;
+}
+
 inline RouteSpeedSegment makeSpeedSegment(int16_t speed) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger()};
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID()};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(int16_t speed, const StopCondition& stop) {
-	RouteSpeedSegment segment = {speed, stop};
+	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID()};
+	return segment;
+}
+
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const StopCondition& stop,
+	const LineFollowPID& lineFollowPid
+) {
+	RouteSpeedSegment segment = {speed, stop, lineFollowPid};
 	return segment;
 }
 
@@ -153,6 +180,7 @@ private:
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);
 	void startSegment_(GeekoBot& robot);
+	void applySpeedSegmentTunings_(const RouteSpeedSegment& segment);
 	void applyActionATick_(GeekoBot& robot, const RouteActionA& action);
 	void applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSpeed);
 	void applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed);

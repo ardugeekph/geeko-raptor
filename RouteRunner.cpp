@@ -171,10 +171,12 @@ void RouteRunner::skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteS
 			}
 		} else {
 			startSegment_(robot);
+			applySpeedSegmentTunings_(step.speedB);
 			state_ = RouteRunnerState::RunningSpeedB;
 		}
 	} else {
 		startSegment_(robot);
+		applySpeedSegmentTunings_(step.speedA);
 		state_ = RouteRunnerState::RunningSpeedA;
 	}
 }
@@ -182,6 +184,15 @@ void RouteRunner::skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteS
 void RouteRunner::startSegment_(GeekoBot& robot) {
 	segmentStartMs_ = millis();
 	segmentDistBaseline_ = maxWheelDistance_(robot);
+}
+
+void RouteRunner::applySpeedSegmentTunings_(const RouteSpeedSegment& segment) {
+	if (segment.lineFollowPid.custom) {
+		lineFollowPid_.setConstants(segment.lineFollowPid.kp, segment.lineFollowPid.ki, segment.lineFollowPid.kd);
+	} else {
+		lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
+	}
+	lineFollowPid_.reset();
 }
 
 void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSpeed) {
@@ -323,6 +334,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 					}
 				} else {
 					startSegment_(robot);
+					applySpeedSegmentTunings_(step.speedB);
 					state_ = RouteRunnerState::RunningSpeedB;
 				}
 			}
