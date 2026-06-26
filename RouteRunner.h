@@ -132,6 +132,27 @@ inline RouteSpeedSegment makeSpeedSegment(
 	return segment;
 }
 
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const LineFollowPID& lineFollowPid
+) {
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid};
+	return segment;
+}
+
+inline RouteSpeedSegment makeNoSpeedSegment() {
+	return makeSpeedSegment(0, stopByTime(0));
+}
+
+inline RouteStep makeStep(
+	const RouteTrigger& trigger,
+	const RouteActionA& action,
+	const RouteSpeedSegment& speedA
+) {
+	RouteStep step = {trigger, action, speedA, makeNoSpeedSegment()};
+	return step;
+}
+
 inline RouteStep makeStep(
 	const RouteTrigger& trigger,
 	const RouteActionA& action,

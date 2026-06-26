@@ -19,8 +19,8 @@ void loop() {
 
 ## RouteRunner (declarative routes)
 
-Define a table of `RouteStep` entries using an explicit 4-item schema:
-`Trigger -> Action -> SpeedA -> SpeedB`.
+Define a table of `RouteStep` entries using the schema:
+`Trigger -> Action -> SpeedA -> [optional SpeedB]`.
 The library runs a non-blocking state machine; your sketch only calls `update` then `tick`.
 
 **Contract:** call `GeekoBot::update()` **before** `RouteRunner::tick(robot)` every `loop()` iteration. `tick()` does not update encoders for you.
@@ -59,11 +59,11 @@ void loop() {
 - **While waiting for a trigger:** both motors are **stopped**. Use `makeNoTrigger()` to skip waiting and start the step immediately (useful for the first step). Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started.
 - **Line trigger:** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires.
 - **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
-- **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between.
+- **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between. Use `makeSpeedSegment(speed, lineFollowPID(kp, ki, kd))` for the same behaviour with per-segment PID.
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
-- **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then SpeedB. If SpeedA uses until-next-trigger, SpeedB is skipped when the next step’s trigger fires.
+- **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then optionally SpeedB. Use the 3-arg `makeStep(trigger, action, speedA)` to omit SpeedB. With a finite SpeedA stop (`stopByTime` / `stopByDistance`), the robot **stops** and waits for the next step’s trigger; with `makeSpeedSegment(speed)` (until-next-trigger), it keeps moving until that trigger fires. If SpeedA uses until-next-trigger in a 4-arg step, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
-- **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the third argument to `makeSpeedSegment(...)`. Segments without `lineFollowPID(...)` use the runner defaults.
+- **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the second argument to `makeSpeedSegment(speed, pid)` or the third argument to `makeSpeedSegment(speed, stop, pid)`. Segments without `lineFollowPID(...)` use the runner defaults.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
 See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.

@@ -25,7 +25,7 @@ static const uint32_t IR_KEY_0 = 0xFF6897;
 static const uint32_t IR_KEY_1 = 0xFF30CF;
 static const uint32_t IR_KEY_2 = 0xFF18E7;
 
-// RouteStep shape is explicit: Trigger, Action, SpeedA, SpeedB.
+// RouteStep: Trigger, Action, SpeedA, and optional SpeedB (3-arg makeStep omits SpeedB).
 // SpeedA/SpeedB are line-follow segments after Action.
 const RouteStep PLAN[] = {
 	makeStep(
@@ -43,8 +43,7 @@ const RouteStep PLAN[] = {
 	makeStep(
 		makeDistanceTrigger(0.f),
 		makeActionForward(100, stopByDistance(1.5f)),
-		makeSpeedSegment(0, stopByTime(0)),
-		makeSpeedSegment(0, stopByTime(0))
+		makeSpeedSegment(130, lineFollowPID(0.13f, 0.0f, 0.15f))
 	),
 };
 
