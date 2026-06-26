@@ -64,6 +64,7 @@ void loop() {
 - **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then optionally SpeedB. Use the 3-arg `makeStep(trigger, action, speedA)` to omit SpeedB. With a finite SpeedA stop (`stopByTime` / `stopByDistance`), the robot **stops** and waits for the next step’s trigger; with `makeSpeedSegment(speed)` (until-next-trigger), it keeps moving until that trigger fires. If SpeedA uses until-next-trigger in a 4-arg step, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the second argument to `makeSpeedSegment(speed, pid)` or the third argument to `makeSpeedSegment(speed, stop, pid)`. Segments without `lineFollowPID(...)` use the runner defaults.
+- **Line-follow mode:** use `LineFollowMode::BlackOnWhite` (default) for a dark line on a light surface, or `LineFollowMode::WhiteOnBlack` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload, e.g. `makeSpeedSegment(130, stopByTime(900), LineFollowMode::WhiteOnBlack)`. This uses inverted `getPos(true)` internally, including correct out-of-bounds search direction. Line triggers may need different `lineThreshold` values on white-on-black tracks.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
 See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.
@@ -107,7 +108,8 @@ int irVals[9];
 robot.sensor.readIrRaw(irVals);                    // Read raw sensor values (0-1023)
 robot.sensor.readIrCalibrated(irVals);             // Read calibrated values (0-1023)
 bool isOutside = robot.sensor.isOut();             // Check if robot is off track
-int position = robot.sensor.getPos();              // Get line position (-3500 to 3500)
+int position = robot.sensor.getPos();              // Black-on-white line position (-3500 to 3500)
+int positionInv = robot.sensor.getPos(true);     // White-on-black (inverted readings + recovery)
 int contrast = robot.sensor.getContrast();         // Get current contrast level
 bool isCheckpoint = robot.sensor.isCheckpoint();   // Detect checkpoints
 ```

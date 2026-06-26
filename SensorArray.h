@@ -12,7 +12,7 @@ class SensorArray {
         void readIrRaw(int* irVals);
 		void readIrCalibrated(int* irVals);
         bool isOut();	// returns the status of robot if it is outside the track
- 		int getPos();
+ 		int getPos(bool inverse = false);
         int getContrast();
 		bool isCheckpoint();
 

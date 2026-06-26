@@ -9,6 +9,7 @@ void RouteRunner::begin(const RouteStep* plan, uint16_t count) {
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
 	rearmTriggerBaseline_ = true;
+	lineFollowMode_ = LineFollowMode::BlackOnWhite;
 	lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
 	actionForwardPid_.setConstants(actionForwardKp_, 0.0f, 0.0f);
 	lineFollowPid_.reset();
@@ -27,6 +28,7 @@ bool RouteRunner::setIndex(uint16_t index, GeekoBot& robot) {
 	index_ = index;
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
+	lineFollowMode_ = LineFollowMode::BlackOnWhite;
 	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
 	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
 	enterWaitingTrigger_(robot);
@@ -192,6 +194,7 @@ void RouteRunner::applySpeedSegmentTunings_(const RouteSpeedSegment& segment) {
 	} else {
 		lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
 	}
+	lineFollowMode_ = segment.lineFollowMode;
 	lineFollowPid_.reset();
 }
 
@@ -218,7 +221,8 @@ void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSp
 }
 
 void RouteRunner::applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed) {
-	const float error = (float)robot.sensor.getPos();
+	const bool inverse = (lineFollowMode_ == LineFollowMode::WhiteOnBlack);
+	const float error = (float)robot.sensor.getPos(inverse);
 	int correction = (int)lineFollowPid_.output(error);
 
 	int left = (int)baseSpeed + correction;

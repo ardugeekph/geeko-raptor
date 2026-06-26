@@ -188,48 +188,48 @@ int SensorArray::getContrast() {
 }
 
 
-int SensorArray::getPos() {
+int SensorArray::getPos(bool inverse) {
 
 	readIrCalibrated(irVal_);
 
-  	float total = (irVal_[0]*0) + (irVal_[1]*1000.00) + (irVal_[2]*2000.00) + (irVal_[3]*3000.00) + (irVal_[4]*4000.00) + (irVal_[5]*5000.00) + (irVal_[6]*6000.00) + (irVal_[7]*7000.00);
-  	float pos = total/(irVal_[0] + irVal_[1] + irVal_[2] + irVal_[3] + irVal_[4] + irVal_[5] + irVal_[6] + irVal_[7]);
-
-    // for (int i = 0; i < 8; i++) {
-    //     Serial.print(irVal_[i]);
-    //     Serial.print("\t");
-    // }
-    // Serial.println();
+	float total = 0.f;
+	float sum = 0.f;
+	for (int i = 0; i < 8; i++) {
+		const int v = inverse ? (1023 - irVal_[i]) : irVal_[i];
+		total += v * (i * 1000.00f);
+		sum += v;
+	}
+	float pos = total / sum;
 
 	//  get lowest and highest reading to know the current contrast
-  	int low=7000, high=0;
-  	for(int i = 0; i < 8; i++){
-    		if(irVal_[i] > high) high = irVal_[i];
-    		if(irVal_[i] < low) low = irVal_[i];
-  	}
+	int low = 7000, high = 0;
+	for (int i = 0; i < 8; i++) {
+		if (irVal_[i] > high) high = irVal_[i];
+		if (irVal_[i] < low) low = irVal_[i];
+	}
 
-	
 	// set outside_ status
-  	if(high-low < contrast_/2) outside = true;
-  	else outside = false;
+	if (high - low < contrast_ / 2) outside = true;
+	else outside = false;
 
 	int highest_val = 0;
-  	if(!outside){
-		for(int i = 0; i < 8; i++){
-			if(irVal_[i] > highest_val){
-				highest_val = irVal_[i];
+	if (!outside) {
+		for (int i = 0; i < 8; i++) {
+			const int v = inverse ? (1023 - irVal_[i]) : irVal_[i];
+			if (v > highest_val) {
+				highest_val = v;
 				lastChannelSeen = i;
 			}
 		}
-  	}
+	}
 
-	if(outside) {
-		if(lastChannelSeen == 0) pos = 0;
-		else if(lastChannelSeen == 7) pos = 7000;
+	if (outside) {
+		if (lastChannelSeen == 0) pos = 0;
+		else if (lastChannelSeen == 7) pos = 7000;
 		else pos = 0;
-  	}
+	}
 
-    return pos - 3500;
+	return pos - 3500;
 }
 
 bool SensorArray::isCheckpoint() {

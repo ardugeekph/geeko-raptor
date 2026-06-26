@@ -8,6 +8,7 @@
 enum class RouteActionKind : uint8_t { None, Forward, Backward, TurnLeft, TurnRight };
 enum class StopKind : uint8_t { ByTime, ByDistance, UntilNextTrigger };
 enum class TriggerKind : uint8_t { None, LineMask, DistanceTravelled };
+enum class LineFollowMode : uint8_t { BlackOnWhite, WhiteOnBlack };
 
 struct StopCondition {
 	StopKind kind;
@@ -39,6 +40,7 @@ struct RouteSpeedSegment {
 	int16_t speed;
 	StopCondition stop;
 	LineFollowPID lineFollowPid;
+	LineFollowMode lineFollowMode;
 };
 
 struct RouteStep {
@@ -113,30 +115,39 @@ inline LineFollowPID lineFollowPID(float kp, float ki, float kd) {
 	return pid;
 }
 
-inline RouteSpeedSegment makeSpeedSegment(int16_t speed) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID()};
-	return segment;
-}
-
-inline RouteSpeedSegment makeSpeedSegment(int16_t speed, const StopCondition& stop) {
-	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID()};
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+) {
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID(), lineFollowMode};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const StopCondition& stop,
-	const LineFollowPID& lineFollowPid
+	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
 ) {
-	RouteSpeedSegment segment = {speed, stop, lineFollowPid};
+	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID(), lineFollowMode};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
-	const LineFollowPID& lineFollowPid
+	const StopCondition& stop,
+	const LineFollowPID& lineFollowPid,
+	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
 ) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid};
+	RouteSpeedSegment segment = {speed, stop, lineFollowPid, lineFollowMode};
+	return segment;
+}
+
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const LineFollowPID& lineFollowPid,
+	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+) {
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid, lineFollowMode};
 	return segment;
 }
 
@@ -224,6 +235,8 @@ private:
 	float lineFollowKp_ = 0.13f;
 	float lineFollowKi_ = 0.0f;
 	float lineFollowKd_ = 0.15f;
+
+	LineFollowMode lineFollowMode_ = LineFollowMode::BlackOnWhite;
 
 	PIDController lineFollowPid_;
 	PIDController actionForwardPid_;
