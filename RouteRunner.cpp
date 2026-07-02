@@ -9,7 +9,7 @@ void RouteRunner::begin(const RouteStep* plan, uint16_t count) {
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
 	rearmTriggerBaseline_ = true;
-	lineFollowMode_ = LineFollowMode::BlackOnWhite;
+	linePolarity_ = LinePolarity::Dark;
 	lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
 	actionForwardPid_.setConstants(actionForwardKp_, 0.0f, 0.0f);
 	lineFollowPid_.reset();
@@ -28,7 +28,7 @@ bool RouteRunner::setIndex(uint16_t index, GeekoBot& robot) {
 	index_ = index;
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
-	lineFollowMode_ = LineFollowMode::BlackOnWhite;
+	linePolarity_ = LinePolarity::Dark;
 	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
 	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
 	enterWaitingTrigger_(robot);
@@ -62,14 +62,65 @@ bool RouteRunner::lineTriggerFired_(const RouteTrigger& tr, int irVals[9]) {
 	if (tr.kind != TriggerKind::LineMask || tr.sensorMask == 0) {
 		return false;
 	}
+	const bool inverse = (tr.linePolarity == LinePolarity::Light);
 	for (int i = 0; i < 9; i++) {
 		if (tr.sensorMask & (1u << i)) {
-			if ((int)irVals[i] < (int)tr.lineThreshold) {
+			const int v = inverse ? (1023 - irVals[i]) : irVals[i];
+			if (v < (int)tr.lineThreshold) {
 				return false;
 			}
 		}
 	}
 	return true;
+}
+
+static bool ruleMatches_(const IrChannelRule& r, int irVals[9]) {
+	if (r.channel > 8) {
+		return false;
+	}
+	const int v = irVals[r.channel];
+	return v >= (int)r.min && v <= (int)r.max;
+}
+
+bool RouteRunner::lineRulesTriggerFired_(const RouteTrigger& tr, int irVals[9]) {
+	if (tr.kind != TriggerKind::LineRules || tr.rules == nullptr || tr.ruleCount == 0) {
+		return false;
+	}
+
+	if (tr.logic == TriggerLogic::All) {
+		for (uint8_t i = 0; i < tr.ruleCount; i++) {
+			if (!ruleMatches_(tr.rules[i], irVals)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	for (uint8_t i = 0; i < tr.ruleCount; i++) {
+		if (ruleMatches_(tr.rules[i], irVals)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool RouteRunner::triggerNeedsIr_(TriggerKind kind) {
+	return kind == TriggerKind::LineMask || kind == TriggerKind::LineRules;
+}
+
+bool RouteRunner::triggerFired_(const RouteTrigger& tr, int irVals[9], float distBaseline, GeekoBot& robot) {
+	switch (tr.kind) {
+		case TriggerKind::None:
+			return true;
+		case TriggerKind::LineMask:
+			return lineTriggerFired_(tr, irVals);
+		case TriggerKind::LineRules:
+			return lineRulesTriggerFired_(tr, irVals);
+		case TriggerKind::DistanceTravelled:
+			return distanceTriggerFired_(tr, distBaseline, robot);
+		default:
+			return false;
+	}
 }
 
 bool RouteRunner::distanceTriggerFired_(const RouteTrigger& tr, float baseline, GeekoBot& robot) {
@@ -99,17 +150,10 @@ bool RouteRunner::nextStepTriggerFired_(GeekoBot& robot) {
 	}
 
 	const RouteTrigger& tr = plan_[index_ + 1].trigger;
-	if (tr.kind == TriggerKind::None) {
-		return true;
-	}
-	if (tr.kind == TriggerKind::LineMask) {
+	if (triggerNeedsIr_(tr.kind)) {
 		robot.sensor.readIrCalibrated(irVals_);
-		return lineTriggerFired_(tr, irVals_);
 	}
-	if (tr.kind == TriggerKind::DistanceTravelled) {
-		return distanceTriggerFired_(tr, triggerDistBaseline_, robot);
-	}
-	return false;
+	return triggerFired_(tr, irVals_, triggerDistBaseline_, robot);
 }
 
 bool RouteRunner::speedSegmentDone_(
@@ -194,7 +238,7 @@ void RouteRunner::applySpeedSegmentTunings_(const RouteSpeedSegment& segment) {
 	} else {
 		lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
 	}
-	lineFollowMode_ = segment.lineFollowMode;
+	linePolarity_ = segment.linePolarity;
 	lineFollowPid_.reset();
 }
 
@@ -221,7 +265,7 @@ void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSp
 }
 
 void RouteRunner::applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed) {
-	const bool inverse = (lineFollowMode_ == LineFollowMode::WhiteOnBlack);
+	const bool inverse = (linePolarity_ == LinePolarity::Light);
 	const float error = (float)robot.sensor.getPos(inverse);
 	int correction = (int)lineFollowPid_.output(error);
 
@@ -281,19 +325,11 @@ void RouteRunner::tick(GeekoBot& robot) {
 
 			robot.stop();
 
-			bool needLine = (step.trigger.kind == TriggerKind::LineMask);
-			if (needLine) {
+			if (triggerNeedsIr_(step.trigger.kind)) {
 				robot.sensor.readIrCalibrated(irVals_);
 			}
 
-			bool fired = false;
-			if (step.trigger.kind == TriggerKind::None) {
-				fired = true;
-			} else if (step.trigger.kind == TriggerKind::LineMask) {
-				fired = lineTriggerFired_(step.trigger, irVals_);
-			} else if (step.trigger.kind == TriggerKind::DistanceTravelled) {
-				fired = distanceTriggerFired_(step.trigger, triggerDistBaseline_, robot);
-			}
+			const bool fired = triggerFired_(step.trigger, irVals_, triggerDistBaseline_, robot);
 
 			if (fired) {
 				if (step.action.kind == RouteActionKind::None) {

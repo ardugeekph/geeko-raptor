@@ -178,6 +178,20 @@ void SensorArray::readIrCalibrated(int* irVals){
 	}
 }
 
+void SensorArray::printIrCalibrated(Stream& out) {
+	int irVals[9];
+	readIrCalibrated(irVals);
+	out.print(F("IR cal:"));
+	for (int i = 0; i < 8; i++) {
+		out.print(F(" F"));
+		out.print(i);
+		out.print(F("="));
+		out.print(irVals[i]);
+	}
+	out.print(F(" BACK="));
+	out.println(irVals[8]);
+}
+
 
 bool SensorArray::isOut() {
 	return outside;

@@ -11,6 +11,7 @@ class SensorArray {
         void calibrate(MotorController& motorL, MotorController& motorR);
         void readIrRaw(int* irVals);
 		void readIrCalibrated(int* irVals);
+		void printIrCalibrated(Stream& out = Serial);
         bool isOut();	// returns the status of robot if it is outside the track
  		int getPos(bool inverse = false);
         int getContrast();

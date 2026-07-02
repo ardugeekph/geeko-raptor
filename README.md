@@ -57,14 +57,25 @@ void loop() {
 ### Behaviour summary
 
 - **While waiting for a trigger:** both motors are **stopped**. Use `makeNoTrigger()` to skip waiting and start the step immediately (useful for the first step). Distance triggers measure `max(left, right)` cumulative `getDistance()` since that wait started.
-- **Line trigger:** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires.
+- **Line trigger (mask):** `makeLineTrigger(sensorMask, lineThreshold)` — every masked bit (0–8 = IR channels, matching `readIrCalibrated`) must read **≥** `lineThreshold` on the 0–1023 calibrated scale. `sensorMask == 0` never fires. Use `makeLineTrigger(mask, LineLevel::Mid)` for named thresholds (`Low` = 256, `Mid` = 512, `High` = 768). Pass `LinePolarity::Light` as the third argument for a light line on a dark surface (inverts readings before compare).
+- **Line trigger (rules):** `makeLineRulesTrigger(rules, TriggerLogic::All)` — per-channel `min`/`max` on the calibrated scale. `TriggerLogic::All` requires every rule to match; `TriggerLogic::Any` fires when any rule matches. Array length is deduced automatically — do not pass a count. No `LinePolarity` on rules; tune `min`/`max` from live readings. Example:
+  ```cpp
+  static const IrChannelRule kLeftJunction[] = {
+    irRule(IrChannel::F1, 400, 1023),
+    irRule(IrChannel::F2, 400, 1023),
+    irRule(IrChannel::F6, 0, 150),
+  };
+  makeLineRulesTrigger(kLeftJunction, TriggerLogic::All)
+  ```
+- **Line trigger masks:** preset constants in `LineTriggers.h` — front layout is `0` (outer left) through `7` (outer right), `8` = back center. Presets: `IR_MASK_OUTER_LEFT` (0), `IR_MASK_INNER_LEFT` (1–3), `IR_MASK_INNER_RIGHT` (4–6), `IR_MASK_OUTER_RIGHT` (7), `IR_MASK_OUTERS` (0,7), `IR_MASK_T_JUNCTION` (1–6), `IR_MASK_T_JUNCTION_BACK` (1–6,8). Build custom masks with `irMask(IrChannel::F2, IrChannel::F3)` etc.
+- **Tuning trigger values:** run `examples/ir_calibrated_monitor/ir_calibrated_monitor.ino`, place the robot at the trigger pose, and read Serial output (`robot.sensor.printIrCalibrated()`). Use those numbers to set each `irRule(ch, min, max)`.
 - **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
 - **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between. Use `makeSpeedSegment(speed, lineFollowPID(kp, ki, kd))` for the same behaviour with per-segment PID.
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
 - **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then optionally SpeedB. Use the 3-arg `makeStep(trigger, action, speedA)` to omit SpeedB. With a finite SpeedA stop (`stopByTime` / `stopByDistance`), the robot **stops** and waits for the next step’s trigger; with `makeSpeedSegment(speed)` (until-next-trigger), it keeps moving until that trigger fires. If SpeedA uses until-next-trigger in a 4-arg step, SpeedB is skipped when the next step’s trigger fires.
 - **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the second argument to `makeSpeedSegment(speed, pid)` or the third argument to `makeSpeedSegment(speed, stop, pid)`. Segments without `lineFollowPID(...)` use the runner defaults.
-- **Line-follow mode:** use `LineFollowMode::BlackOnWhite` (default) for a dark line on a light surface, or `LineFollowMode::WhiteOnBlack` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload, e.g. `makeSpeedSegment(130, stopByTime(900), LineFollowMode::WhiteOnBlack)`. This uses inverted `getPos(true)` internally, including correct out-of-bounds search direction. Line triggers may need different `lineThreshold` values on white-on-black tracks.
+- **Line polarity:** use `LinePolarity::Dark` (default) for a dark line on a light surface, or `LinePolarity::Light` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload or as the third argument to `makeLineTrigger(...)`, e.g. `makeSpeedSegment(130, stopByTime(900), LinePolarity::Light)` or `makeLineTrigger(IR_MASK_INNER_LEFT, LineLevel::Mid, LinePolarity::Light)`. Speed segments use inverted `getPos(true)` internally; mask line triggers invert each masked channel reading (`1023 - value`) before threshold compare.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
 See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.
@@ -107,6 +118,7 @@ robot.update();                                                // Update encoder
 int irVals[9];
 robot.sensor.readIrRaw(irVals);                    // Read raw sensor values (0-1023)
 robot.sensor.readIrCalibrated(irVals);             // Read calibrated values (0-1023)
+robot.sensor.printIrCalibrated(Serial);            // Print all channels (for tuning LineRules)
 bool isOutside = robot.sensor.isOut();             // Check if robot is off track
 int position = robot.sensor.getPos();              // Black-on-white line position (-3500 to 3500)
 int positionInv = robot.sensor.getPos(true);     // White-on-black (inverted readings + recovery)

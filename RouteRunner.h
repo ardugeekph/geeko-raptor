@@ -7,8 +7,10 @@
 
 enum class RouteActionKind : uint8_t { None, Forward, Backward, TurnLeft, TurnRight };
 enum class StopKind : uint8_t { ByTime, ByDistance, UntilNextTrigger };
-enum class TriggerKind : uint8_t { None, LineMask, DistanceTravelled };
-enum class LineFollowMode : uint8_t { BlackOnWhite, WhiteOnBlack };
+enum class TriggerKind : uint8_t { None, LineMask, LineRules, DistanceTravelled };
+enum class LinePolarity : uint8_t { Dark, Light };
+
+#include "LineTriggers.h"
 
 struct StopCondition {
 	StopKind kind;
@@ -18,9 +20,13 @@ struct StopCondition {
 
 struct RouteTrigger {
 	TriggerKind kind;
+	float travelInches;
 	uint16_t sensorMask;
 	uint16_t lineThreshold;
-	float travelInches;
+	LinePolarity linePolarity;
+	const IrChannelRule* rules;
+	uint8_t ruleCount;
+	TriggerLogic logic;
 };
 
 struct RouteActionA {
@@ -40,7 +46,7 @@ struct RouteSpeedSegment {
 	int16_t speed;
 	StopCondition stop;
 	LineFollowPID lineFollowPid;
-	LineFollowMode lineFollowMode;
+	LinePolarity linePolarity;
 };
 
 struct RouteStep {
@@ -66,17 +72,67 @@ inline StopCondition stopUntilNextTrigger() {
 }
 
 inline RouteTrigger makeNoTrigger() {
-	RouteTrigger t = {TriggerKind::None, 0, 0, 0.f};
+	RouteTrigger t = {
+		TriggerKind::None, 0.f, 0, 0, LinePolarity::Dark, nullptr, 0, TriggerLogic::All
+	};
 	return t;
 }
 
-inline RouteTrigger makeLineTrigger(uint16_t sensorMask, uint16_t lineThreshold) {
-	RouteTrigger t = {TriggerKind::LineMask, sensorMask, lineThreshold, 0.f};
+inline RouteTrigger makeLineTrigger(
+	uint16_t sensorMask,
+	uint16_t lineThreshold,
+	LinePolarity linePolarity = LinePolarity::Dark
+) {
+	RouteTrigger t = {
+		TriggerKind::LineMask,
+		0.f,
+		sensorMask,
+		lineThreshold,
+		linePolarity,
+		nullptr,
+		0,
+		TriggerLogic::All
+	};
+	return t;
+}
+
+inline RouteTrigger makeLineTrigger(
+	uint16_t sensorMask,
+	LineLevel level,
+	LinePolarity linePolarity = LinePolarity::Dark
+) {
+	return makeLineTrigger(sensorMask, static_cast<uint16_t>(level), linePolarity);
+}
+
+template<uint8_t N>
+inline RouteTrigger makeLineRulesTrigger(
+	const IrChannelRule (&rules)[N],
+	TriggerLogic logic = TriggerLogic::All
+) {
+	RouteTrigger t = {
+		TriggerKind::LineRules,
+		0.f,
+		0,
+		0,
+		LinePolarity::Dark,
+		rules,
+		N,
+		logic
+	};
 	return t;
 }
 
 inline RouteTrigger makeDistanceTrigger(float travelInches) {
-	RouteTrigger t = {TriggerKind::DistanceTravelled, 0, 0, travelInches};
+	RouteTrigger t = {
+		TriggerKind::DistanceTravelled,
+		travelInches,
+		0,
+		0,
+		LinePolarity::Dark,
+		nullptr,
+		0,
+		TriggerLogic::All
+	};
 	return t;
 }
 
@@ -117,18 +173,18 @@ inline LineFollowPID lineFollowPID(float kp, float ki, float kd) {
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
-	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+	LinePolarity linePolarity = LinePolarity::Dark
 ) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID(), lineFollowMode};
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID(), linePolarity};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const StopCondition& stop,
-	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+	LinePolarity linePolarity = LinePolarity::Dark
 ) {
-	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID(), lineFollowMode};
+	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID(), linePolarity};
 	return segment;
 }
 
@@ -136,18 +192,18 @@ inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const StopCondition& stop,
 	const LineFollowPID& lineFollowPid,
-	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+	LinePolarity linePolarity = LinePolarity::Dark
 ) {
-	RouteSpeedSegment segment = {speed, stop, lineFollowPid, lineFollowMode};
+	RouteSpeedSegment segment = {speed, stop, lineFollowPid, linePolarity};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const LineFollowPID& lineFollowPid,
-	LineFollowMode lineFollowMode = LineFollowMode::BlackOnWhite
+	LinePolarity linePolarity = LinePolarity::Dark
 ) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid, lineFollowMode};
+	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid, linePolarity};
 	return segment;
 }
 
@@ -200,7 +256,10 @@ public:
 private:
 	static float maxWheelDistance_(GeekoBot& robot);
 	static bool lineTriggerFired_(const RouteTrigger& tr, int irVals[9]);
+	static bool lineRulesTriggerFired_(const RouteTrigger& tr, int irVals[9]);
 	static bool distanceTriggerFired_(const RouteTrigger& tr, float baseline, GeekoBot& robot);
+	static bool triggerFired_(const RouteTrigger& tr, int irVals[9], float distBaseline, GeekoBot& robot);
+	static bool triggerNeedsIr_(TriggerKind kind);
 	static bool stopIsNoOp_(const StopCondition& stop);
 	static bool stopIsUntilNextTrigger_(const StopCondition& stop);
 	static bool stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
@@ -236,7 +295,7 @@ private:
 	float lineFollowKi_ = 0.0f;
 	float lineFollowKd_ = 0.15f;
 
-	LineFollowMode lineFollowMode_ = LineFollowMode::BlackOnWhite;
+	LinePolarity linePolarity_ = LinePolarity::Dark;
 
 	PIDController lineFollowPid_;
 	PIDController actionForwardPid_;
