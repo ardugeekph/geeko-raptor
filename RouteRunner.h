@@ -237,6 +237,10 @@ inline RouteStep makeStep(
 	return makeStep(trigger, action, makeNoSpeedSegment());
 }
 
+inline RouteStep makeStep(const RouteActionA& action) {
+	return makeStep(makeNoTrigger(), action);
+}
+
 enum class RouteRunnerState : uint8_t {
 	WaitingTrigger,
 	RunningAction,
