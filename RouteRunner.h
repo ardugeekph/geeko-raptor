@@ -230,6 +230,13 @@ inline RouteStep makeStep(
 	return step;
 }
 
+inline RouteStep makeStep(
+	const RouteTrigger& trigger,
+	const RouteActionA& action
+) {
+	return makeStep(trigger, action, makeNoSpeedSegment());
+}
+
 enum class RouteRunnerState : uint8_t {
 	WaitingTrigger,
 	RunningAction,
@@ -267,6 +274,7 @@ private:
 	bool nextStepTriggerFired_(GeekoBot& robot);
 	bool speedSegmentDone_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
 	void advanceToNextStepAction_(GeekoBot& robot);
+	void advanceToNextStep_(GeekoBot& robot);
 
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);

@@ -205,16 +205,37 @@ void RouteRunner::enterWaitingTrigger_(GeekoBot& robot) {
 	actionForwardPid_.reset();
 }
 
+void RouteRunner::advanceToNextStep_(GeekoBot& robot) {
+	index_++;
+	if (index_ >= count_) {
+		state_ = RouteRunnerState::Finished;
+		robot.stop();
+		return;
+	}
+
+	triggerDistBaseline_ = maxWheelDistance_(robot);
+	const RouteStep& step = plan_[index_];
+
+	if (step.trigger.kind != TriggerKind::None) {
+		enterWaitingTrigger_(robot);
+		return;
+	}
+
+	if (step.action.kind != RouteActionKind::None) {
+		actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
+		actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+		startSegment_(robot);
+		lineFollowPid_.reset();
+		state_ = RouteRunnerState::RunningAction;
+	} else {
+		skipActionAndBeginSpeedSegments_(robot, step);
+	}
+}
+
 void RouteRunner::skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step) {
 	if (stopIsNoOp_(step.speedA.stop)) {
 		if (stopIsNoOp_(step.speedB.stop)) {
-			index_++;
-			if (index_ >= count_) {
-				state_ = RouteRunnerState::Finished;
-				robot.stop();
-			} else {
-				enterWaitingTrigger_(robot);
-			}
+			advanceToNextStep_(robot);
 		} else {
 			startSegment_(robot);
 			applySpeedSegmentTunings_(step.speedB);
@@ -365,13 +386,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 				if (stopIsUntilNextTrigger_(step.speedA.stop)) {
 					advanceToNextStepAction_(robot);
 				} else if (stopIsNoOp_(step.speedB.stop)) {
-					index_++;
-					if (index_ >= count_) {
-						state_ = RouteRunnerState::Finished;
-						robot.stop();
-					} else {
-						enterWaitingTrigger_(robot);
-					}
+					advanceToNextStep_(robot);
 				} else {
 					startSegment_(robot);
 					applySpeedSegmentTunings_(step.speedB);
@@ -388,13 +403,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 				if (stopIsUntilNextTrigger_(step.speedB.stop)) {
 					advanceToNextStepAction_(robot);
 				} else {
-					index_++;
-					if (index_ >= count_) {
-						state_ = RouteRunnerState::Finished;
-						robot.stop();
-					} else {
-						enterWaitingTrigger_(robot);
-					}
+					advanceToNextStep_(robot);
 				}
 			}
 			break;
