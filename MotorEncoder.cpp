@@ -4,6 +4,7 @@
 void MotorEncoder::begin(int motorC1, int motorC2) {
     motorC1Pin = motorC1;
     motorC2Pin = motorC2;
+    countInverted_ = false;
 
     pinMode(motorC1Pin, INPUT);
     pinMode(motorC2Pin, INPUT);
@@ -12,7 +13,7 @@ void MotorEncoder::begin(int motorC1, int motorC2) {
 
 void MotorEncoder::increment() {
     noInterrupts();
-    tickCount++;
+    tickCount += countInverted_ ? -1 : 1;
     cummulativeTickCount++;
     interrupts();
 }
@@ -20,9 +21,19 @@ void MotorEncoder::increment() {
 
 void MotorEncoder::decrement() {
     noInterrupts();
-    tickCount--;
+    tickCount += countInverted_ ? 1 : -1;
     cummulativeTickCount++;
     interrupts();
+}
+
+
+void MotorEncoder::reverseCounting() {
+    countInverted_ = !countInverted_;
+}
+
+
+bool MotorEncoder::isCountInverted() const {
+    return countInverted_;
 }
 
 
@@ -81,7 +92,7 @@ void MotorEncoder::setWheelDiameter(float diameter) {
 }
 
 
-float MotorEncoder::getWheelDiameter() {
+float MotorEncoder::getWheelDiameter() const {
     return wheelDiameter;
 }
 

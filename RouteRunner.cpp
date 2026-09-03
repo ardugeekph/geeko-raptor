@@ -11,7 +11,7 @@ void RouteRunner::begin(const RouteStep* plan, uint16_t count) {
 	rearmTriggerBaseline_ = true;
 	linePolarity_ = LinePolarity::Dark;
 	lineFollowPid_.setConstants(lineFollowKp_, lineFollowKi_, lineFollowKd_);
-	actionForwardPid_.setConstants(actionForwardKp_, 0.0f, 0.0f);
+	actionForwardPid_.setConstants(actionForwardKp_, actionForwardKi_, 0.0f);
 	lineFollowPid_.reset();
 	actionForwardPid_.reset();
 }
@@ -31,6 +31,8 @@ bool RouteRunner::setIndex(uint16_t index, GeekoBot& robot) {
 	linePolarity_ = LinePolarity::Dark;
 	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
 	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+	actionDirBaselineL_ = robot.motorLeft.encoder.getDirectionalDistance();
+	actionDirBaselineR_ = robot.motorRight.encoder.getDirectionalDistance();
 	enterWaitingTrigger_(robot);
 	return true;
 }
@@ -40,9 +42,18 @@ void RouteRunner::restartFromIndex(uint16_t index, GeekoBot& robot) {
 }
 
 void RouteRunner::setActionForwardControl(float kp, int16_t maxCorrection) {
+	setActionForwardControl(kp, 0.0f, maxCorrection);
+}
+
+void RouteRunner::setActionForwardControl(float kp, float ki, int16_t maxCorrection) {
 	actionForwardKp_ = kp;
+	actionForwardKi_ = ki;
 	maxActionForwardCorrection_ = maxCorrection;
-	actionForwardPid_.setConstants(kp, 0.0f, 0.0f);
+	actionForwardPid_.setConstants(kp, ki, 0.0f);
+}
+
+void RouteRunner::setTurnScale(float scale) {
+	turnScale_ = scale;
 }
 
 void RouteRunner::setLineFollowTunings(float kp, float ki, float kd) {
@@ -183,10 +194,7 @@ void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
 		return;
 	}
 
-	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
-	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
-	startSegment_(robot);
-	lineFollowPid_.reset();
+	startAction_(robot);
 	state_ = RouteRunnerState::RunningAction;
 }
 
@@ -195,6 +203,31 @@ bool RouteRunner::stopSatisfied_(const StopCondition& stop, unsigned long startM
 		return (millis() - startMs) >= stop.timeMs;
 	}
 	return (maxWheelDistance_(robot) - startDist) >= stop.distanceInches;
+}
+
+bool RouteRunner::turnSatisfied_(
+	const RouteActionA& action,
+	float dirBaselineL,
+	float dirBaselineR,
+	GeekoBot& robot,
+	float turnScale
+) {
+	if (action.turnDegrees <= 0.f) {
+		return true;
+	}
+
+	const float deltaL = robot.motorLeft.encoder.getDirectionalDistance() - dirBaselineL;
+	const float deltaR = robot.motorRight.encoder.getDirectionalDistance() - dirBaselineR;
+	const float diff = deltaR - deltaL;
+	const float targetDiff = robot.turnTargetWheelDiffInches(action.turnDegrees) * turnScale;
+
+	if (action.kind == RouteActionKind::TurnLeft) {
+		return diff >= targetDiff;
+	}
+	if (action.kind == RouteActionKind::TurnRight) {
+		return diff <= -targetDiff;
+	}
+	return false;
 }
 
 void RouteRunner::enterWaitingTrigger_(GeekoBot& robot) {
@@ -222,10 +255,7 @@ void RouteRunner::advanceToNextStep_(GeekoBot& robot) {
 	}
 
 	if (step.action.kind != RouteActionKind::None) {
-		actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
-		actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
-		startSegment_(robot);
-		lineFollowPid_.reset();
+		startAction_(robot);
 		state_ = RouteRunnerState::RunningAction;
 	} else {
 		skipActionAndBeginSpeedSegments_(robot, step);
@@ -253,6 +283,16 @@ void RouteRunner::startSegment_(GeekoBot& robot) {
 	segmentDistBaseline_ = maxWheelDistance_(robot);
 }
 
+void RouteRunner::startAction_(GeekoBot& robot) {
+	actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
+	actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
+	actionDirBaselineL_ = robot.motorLeft.encoder.getDirectionalDistance();
+	actionDirBaselineR_ = robot.motorRight.encoder.getDirectionalDistance();
+	startSegment_(robot);
+	lineFollowPid_.reset();
+	actionForwardPid_.reset();
+}
+
 void RouteRunner::applySpeedSegmentTunings_(const RouteSpeedSegment& segment) {
 	if (segment.lineFollowPid.custom) {
 		lineFollowPid_.setConstants(segment.lineFollowPid.kp, segment.lineFollowPid.ki, segment.lineFollowPid.kd);
@@ -263,19 +303,23 @@ void RouteRunner::applySpeedSegmentTunings_(const RouteSpeedSegment& segment) {
 	lineFollowPid_.reset();
 }
 
-void RouteRunner::applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSpeed) {
+void RouteRunner::applyDifferentialDriveTick_(GeekoBot& robot, int16_t signedSpeed) {
 	const float currentL = robot.motorLeft.encoder.getDistance();
 	const float currentR = robot.motorRight.encoder.getDistance();
 	const float deltaL = currentL - actionDistBaselineL_;
 	const float deltaR = currentR - actionDistBaselineR_;
-	const float error = deltaL - deltaR;
+	float error = deltaL - deltaR;
+	if (signedSpeed < 0) {
+		error = -error;
+	}
 
 	int correction = (int)actionForwardPid_.output(error);
 	if (correction > maxActionForwardCorrection_) correction = maxActionForwardCorrection_;
 	if (correction < -maxActionForwardCorrection_) correction = -maxActionForwardCorrection_;
 
-	int left = (int)baseSpeed - correction;
-	int right = (int)baseSpeed + correction;
+	const int trim = robot.getStraightPwmTrim();
+	int left = (int)signedSpeed - correction - trim;
+	int right = (int)signedSpeed + correction + trim;
 	if (left > 255) left = 255;
 	if (left < -255) left = -255;
 	if (right > 255) right = 255;
@@ -317,14 +361,26 @@ void RouteRunner::applyActionATick_(GeekoBot& robot, const RouteActionA& action)
 			robot.motorRight.setSpeed(-speedMag);
 			break;
 		case RouteActionKind::Backward:
-			robot.motorLeft.setSpeed(-speedMag);
-			robot.motorRight.setSpeed(-speedMag);
+			applyDifferentialDriveTick_(robot, (int16_t)-speedMag);
 			break;
 		case RouteActionKind::Forward:
 		default:
-			applyActionForwardControlTick_(robot, speedMag);
+			applyDifferentialDriveTick_(robot, (int16_t)speedMag);
 			break;
 	}
+}
+
+static bool isTurnAction_(RouteActionKind kind) {
+	return kind == RouteActionKind::TurnLeft || kind == RouteActionKind::TurnRight;
+}
+
+bool RouteRunner::actionDone_(const RouteStep& step, GeekoBot& robot) {
+	const RouteActionA& action = step.action;
+	if (isTurnAction_(action.kind)) {
+		return turnSatisfied_(action, actionDirBaselineL_, actionDirBaselineR_, robot, turnScale_);
+	}
+	return stopIsNoOp_(action.stop) ||
+		stopSatisfied_(action.stop, segmentStartMs_, segmentDistBaseline_, robot);
 }
 
 void RouteRunner::tick(GeekoBot& robot) {
@@ -356,9 +412,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 				if (step.action.kind == RouteActionKind::None) {
 					skipActionAndBeginSpeedSegments_(robot, step);
 				} else {
-					actionDistBaselineL_ = robot.motorLeft.encoder.getDistance();
-					actionDistBaselineR_ = robot.motorRight.encoder.getDistance();
-					startSegment_(robot);
+					startAction_(robot);
 					state_ = RouteRunnerState::RunningAction;
 				}
 			}
@@ -372,8 +426,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 			}
 
 			applyActionATick_(robot, step.action);
-			if (stopIsNoOp_(step.action.stop) ||
-				stopSatisfied_(step.action.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
+			if (actionDone_(step, robot)) {
 				skipActionAndBeginSpeedSegments_(robot, step);
 			}
 			break;

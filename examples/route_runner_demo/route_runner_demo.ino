@@ -11,7 +11,7 @@
 #include <RouteRunner.h>
 
 #define MOTOR_RPM 1500
-#define WHEEL_DIAMETER 1.1
+#define WHEEL_DIAMETER GEEKO_WHEEL_DIAMETER_IN
 
 GeekoBot robot;
 RouteRunner runner;
@@ -40,6 +40,8 @@ const RouteStep PLAN[] = {
 		makeActionForward(100, stopByDistance(1.5f)),
 		makeSpeedSegment(130, lineFollowPID(0.13f, 0.0f, 0.15f))
 	),
+	makeStep(makeActionTurnLeft(150, 90.0f)),
+	makeStep(makeActionForward(100, stopByDistance(1.0f))),
 };
 
 void setup() {

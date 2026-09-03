@@ -9,6 +9,7 @@
 class MotorController {
 	public:
 		void begin(int motorA, int motorB, int motorPwm, int motorC1, int motorC2, int motorRPM, float wheelDiameter);
+		void reverse();
 		void setSpeed(int pwm);
 		void setRpmSpeed(float targetRPM, float accel = 1, bool reverse=false); // accel in m/s^2
 		void stop();

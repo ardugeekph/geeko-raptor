@@ -71,17 +71,18 @@ void loop() {
 - **Tuning trigger values:** run `examples/ir_calibrated_monitor/ir_calibrated_monitor.ino`, place the robot at the trigger pose, and read Serial output (`robot.sensor.printIrCalibrated()`). Use those numbers to set each `irRule(ch, min, max)`.
 - **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
 - **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between. Use `makeSpeedSegment(speed, lineFollowPID(kp, ki, kd))` for the same behaviour with per-segment PID.
-- **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionTurnLeft(speed, stop)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
+- **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionBackward(speed, stop)`. Turns use degrees: `makeActionTurnLeft(speed, degrees)`, `makeActionTurnRight(speed, degrees)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
 - **Action-only steps:** use `makeStep(action)` or `makeStep(trigger, action)` to omit speed segments (both default to `makeNoSpeedSegment()`). Chain manual moves — forward, backward, turn — and the runner advances **without stopping** between steps that use `makeNoTrigger()` (the default for 1-arg `makeStep`). When the next step has a real trigger (line, distance, rules), motors stop and wait as usual.
   ```cpp
   const RouteStep PLAN[] = {
     makeStep(makeActionForward(200, stopByDistance(2.0f))),
     makeStep(makeActionBackward(200, stopByDistance(1.0f))),
-    makeStep(makeActionTurnLeft(200, stopByTime(400))),
+    makeStep(makeActionTurnLeft(200, 90.0f)),
   };
   ```
+- **Turn semantics:** in-place turns apply opposite wheel PWM (`TurnLeft => left=-speed,right=+speed`). Stop when encoder wheel differential reaches `(degrees × π/180) × trackWidth` using `getDirectionalDistance()`. Default track width is `GEEKO_TRACK_WIDTH_IN` (10 cm between wheel centers). Optional `runner.setTurnScale(f)` if turns are consistently short/long (slip).
+- **Straight action skew:** forward and backward actions use differential PID on wheel distance error plus EEPROM trim from `calibrateStraightDrive()`. Run once via `examples/straight_calibrate/straight_calibrate.ino` (uncomment `robot.calibrateStraightDrive()`): LEDs blink and buzzer beeps for 10 s while you manually push the robot straight; trim is saved to EEPROM and auto-loaded in `begin()`. RouteRunner reads `robot.getStraightPwmTrim()` each tick. Tune with `runner.setActionForwardControl(kp, ki, maxCorrection)`.
 - **SpeedA / SpeedB:** after `Action` ends, runner enters line-follow mode for SpeedA then optionally SpeedB. Use `makeStep(action)` or `makeStep(trigger, action)` for action-only steps, or the 3-arg `makeStep(trigger, action, speedA)` to omit SpeedB. With a finite SpeedA stop (`stopByTime` / `stopByDistance`), the robot **stops** and waits for the next step’s trigger; with `makeSpeedSegment(speed)` (until-next-trigger), it keeps moving until that trigger fires. If SpeedA uses until-next-trigger in a 4-arg step, SpeedB is skipped when the next step’s trigger fires.
-- **Turn semantics:** turns apply opposite polarity automatically (`TurnLeft => left=-speed,right=+speed`, `TurnRight => left=+speed,right=-speed`).
 - **Line-follow tuning:** set global defaults with `runner.setLineFollowTunings(kp, ki, kd)`, or per speed segment with `lineFollowPID(kp, ki, kd)` as the second argument to `makeSpeedSegment(speed, pid)` or the third argument to `makeSpeedSegment(speed, stop, pid)`. Segments without `lineFollowPID(...)` use the runner defaults.
 - **Line polarity:** use `LinePolarity::Dark` (default) for a dark line on a light surface, or `LinePolarity::Light` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload or as the third argument to `makeLineTrigger(...)`, e.g. `makeSpeedSegment(130, stopByTime(900), LinePolarity::Light)` or `makeLineTrigger(IR_MASK_INNER_LEFT, LineLevel::Mid, LinePolarity::Light)`. Speed segments use inverted `getPos(true)` internally; mask line triggers invert each masked channel reading (`1023 - value`) before threshold compare.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
@@ -114,8 +115,15 @@ if (IrReceiver.decode()) {
 
 ### GeekoBot (`robot`)
 ```cpp
-robot.begin(int motorRpm = 2000, float wheelDiameter = 1.1);  // Initialize robot
+// Geometry defaults: GEEKO_WHEEL_DIAMETER_IN (1.1), GEEKO_TRACK_WIDTH_CM (10), GEEKO_TRACK_WIDTH_IN (~3.94)
+robot.begin(int motorRpm = 2000, float wheelDiameter = GEEKO_WHEEL_DIAMETER_IN,
+            float trackWidth = GEEKO_TRACK_WIDTH_IN);
 robot.calibrateSensors();                                     // Calibrate IR sensors
+robot.calibrateStraightDrive();                               // Manual 10s straight cal → EEPROM
+robot.getStraightPwmTrim();                                   // Trim loaded from EEPROM in begin()
+robot.hasStraightCalibration();                               // true if EEPROM magic present
+robot.getTrackWidth();                                        // Track width in inches
+robot.turnTargetWheelDiffInches(float degrees);               // Wheel diff for in-place turn
 robot.moveStraight(int rpm, stopCallback);                    // Move straight with PID
 robot.stop();                                                  // Stop both motors
 robot.update();                                                // Update encoders and sensors
@@ -138,6 +146,7 @@ bool isCheckpoint = robot.sensor.isCheckpoint();   // Detect checkpoints
 ```cpp
 robot.motorLeft.setSpeed(int pwm);                           // Set PWM speed (-255 to 255)
 robot.motorLeft.setRpmSpeed(float targetRPM, float accel = 1, bool reverse = false);
+robot.motorLeft.reverse();                                   // Swap direction pins + flip encoder signed counting
 robot.motorLeft.stop();                                      // Stop motor
 ```
 
@@ -172,6 +181,7 @@ void rightEncoderISR() {
 float rpm = robot.motorLeft.encoder.getRpm();                    // Get current RPM
 float distance = robot.motorLeft.encoder.getDistance();          // Get distance (inches)
 float dirDistance = robot.motorLeft.encoder.getDirectionalDistance(); // Get signed distance
+bool inverted = robot.motorLeft.encoder.isCountInverted();       // true after motor.reverse()
 ```
 
 ### Buzzer (`robot.buzzer`)
@@ -268,6 +278,7 @@ robot.motorLeft.encoder.reset();                       // Reset encoder count
 - Position values range from -3500 (far left) to +3500 (far right)
 - Sensor array has 9 channels (8 front + 1 back)
 - Calibration data is automatically saved to EEPROM
+- EEPROM layout: bytes 0–38 IR calibration; byte 39 magic `0x53`, bytes 40–41 straight-drive `pwmTrim` (int16)
 - All distance measurements are in inches
 - RPM control includes built-in acceleration limiting
 - Encoder interrupts are required for accurate RPM calculation

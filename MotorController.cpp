@@ -19,6 +19,16 @@ void MotorController::begin(int motorA, int motorB, int motorPwm, int motorC1, i
 }
 
 
+void MotorController::reverse() {
+	stop();
+	const int swappedA = motorBpin;
+	const int swappedB = motorApin;
+	motorApin = swappedA;
+	motorBpin = swappedB;
+	encoder.reverseCounting();
+}
+
+
 void MotorController::setSpeed(int pwm){
 	if(pwm > 255) pwm = 255;
   	if(pwm < -255) pwm = -255;

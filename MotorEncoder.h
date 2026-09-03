@@ -10,13 +10,15 @@ class MotorEncoder {
         void attachEncoderInterrupt(void (*isr)());
         void increment();
         void decrement();
+        void reverseCounting();
+        bool isCountInverted() const;
         void reset();
         long getTicks();
         float getRpm();
         float getDistance();
         float getDirectionalDistance();
         void setWheelDiameter(float diameter = 1.2);
-        float getWheelDiameter();
+        float getWheelDiameter() const;
         void update();
 
     private:
@@ -27,6 +29,7 @@ class MotorEncoder {
         volatile long lastTickCount = 0;
         unsigned long lastUpdate = 0;
         volatile long cummulativeTickCount = 0;
+        bool countInverted_ = false;
         float rpm = 0;
         int ticksPerRevolution = 135;
         float wheelDiameter = 0;

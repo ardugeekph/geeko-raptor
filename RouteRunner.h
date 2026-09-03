@@ -33,6 +33,7 @@ struct RouteActionA {
 	RouteActionKind kind;
 	int16_t speed;
 	StopCondition stop;
+	float turnDegrees;
 };
 
 struct LineFollowPID {
@@ -137,27 +138,27 @@ inline RouteTrigger makeDistanceTrigger(float travelInches) {
 }
 
 inline RouteActionA makeNoAction() {
-	RouteActionA a = {RouteActionKind::None, 0, stopByTime(0)};
+	RouteActionA a = {RouteActionKind::None, 0, stopByTime(0), 0.f};
 	return a;
 }
 
 inline RouteActionA makeActionForward(int16_t speed, const StopCondition& stop) {
-	RouteActionA a = {RouteActionKind::Forward, speed, stop};
+	RouteActionA a = {RouteActionKind::Forward, speed, stop, 0.f};
 	return a;
 }
 
 inline RouteActionA makeActionBackward(int16_t speed, const StopCondition& stop) {
-	RouteActionA a = {RouteActionKind::Backward, speed, stop};
+	RouteActionA a = {RouteActionKind::Backward, speed, stop, 0.f};
 	return a;
 }
 
-inline RouteActionA makeActionTurnLeft(int16_t speed, const StopCondition& stop) {
-	RouteActionA a = {RouteActionKind::TurnLeft, speed, stop};
+inline RouteActionA makeActionTurnLeft(int16_t speed, float degrees) {
+	RouteActionA a = {RouteActionKind::TurnLeft, speed, stopByTime(0), degrees};
 	return a;
 }
 
-inline RouteActionA makeActionTurnRight(int16_t speed, const StopCondition& stop) {
-	RouteActionA a = {RouteActionKind::TurnRight, speed, stop};
+inline RouteActionA makeActionTurnRight(int16_t speed, float degrees) {
+	RouteActionA a = {RouteActionKind::TurnRight, speed, stopByTime(0), degrees};
 	return a;
 }
 
@@ -258,6 +259,8 @@ public:
 	void restartFromIndex(uint16_t index, GeekoBot& robot);
 	uint16_t stepCount() const { return count_; }
 	void setActionForwardControl(float kp, int16_t maxCorrection);
+	void setActionForwardControl(float kp, float ki, int16_t maxCorrection);
+	void setTurnScale(float scale);
 	void setLineFollowTunings(float kp, float ki, float kd);
 
 	bool finished() const { return state_ == RouteRunnerState::Finished; }
@@ -274,8 +277,10 @@ private:
 	static bool stopIsNoOp_(const StopCondition& stop);
 	static bool stopIsUntilNextTrigger_(const StopCondition& stop);
 	static bool stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
+	static bool turnSatisfied_(const RouteActionA& action, float dirBaselineL, float dirBaselineR, GeekoBot& robot, float turnScale);
 
 	bool nextStepTriggerFired_(GeekoBot& robot);
+	bool actionDone_(const RouteStep& step, GeekoBot& robot);
 	bool speedSegmentDone_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
 	void advanceToNextStepAction_(GeekoBot& robot);
 	void advanceToNextStep_(GeekoBot& robot);
@@ -283,9 +288,10 @@ private:
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);
 	void startSegment_(GeekoBot& robot);
+	void startAction_(GeekoBot& robot);
 	void applySpeedSegmentTunings_(const RouteSpeedSegment& segment);
 	void applyActionATick_(GeekoBot& robot, const RouteActionA& action);
-	void applyActionForwardControlTick_(GeekoBot& robot, int16_t baseSpeed);
+	void applyDifferentialDriveTick_(GeekoBot& robot, int16_t signedSpeed);
 	void applyLineFollowTick_(GeekoBot& robot, int16_t baseSpeed);
 
 	const RouteStep* plan_ = nullptr;
@@ -298,10 +304,14 @@ private:
 	float segmentDistBaseline_ = 0.f;
 	float actionDistBaselineL_ = 0.f;
 	float actionDistBaselineR_ = 0.f;
+	float actionDirBaselineL_ = 0.f;
+	float actionDirBaselineR_ = 0.f;
 	bool rearmTriggerBaseline_ = true;
 
 	float actionForwardKp_ = 8.0f;
+	float actionForwardKi_ = 0.0f;
 	int16_t maxActionForwardCorrection_ = 40;
+	float turnScale_ = 1.0f;
 
 	float lineFollowKp_ = 0.13f;
 	float lineFollowKi_ = 0.0f;
