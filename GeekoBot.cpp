@@ -4,7 +4,7 @@
 #include "GeekoBot.h"
 #include "PIDController.h"
 
-static constexpr int MOTOR_ENCODER_TICKS_PER_REV = 135;
+static constexpr int MOTOR_ENCODER_TICKS_PER_REV = 288;
 static constexpr uint8_t STRAIGHT_CAL_EEPROM_MAGIC = 0x53;
 static constexpr int STRAIGHT_CAL_EEPROM_MAGIC_ADDR = 39;
 static constexpr int STRAIGHT_CAL_EEPROM_TRIM_ADDR = 40;

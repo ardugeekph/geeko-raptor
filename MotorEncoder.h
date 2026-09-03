@@ -31,7 +31,7 @@ class MotorEncoder {
         volatile long cummulativeTickCount = 0;
         bool countInverted_ = false;
         float rpm = 0;
-        int ticksPerRevolution = 135;
+        int ticksPerRevolution = 288;
         float wheelDiameter = 0;
 };
 
