@@ -261,7 +261,7 @@ public:
 	void setActionForwardControl(float kp, int16_t maxCorrection);
 	void setActionForwardControl(float kp, float ki, int16_t maxCorrection);
 	void setTurnScale(float scale);
-	void setLineFollowTunings(float kp, float ki, float kd);
+	void setLineFollowPID(float kp, float ki, float kd);
 
 	bool finished() const { return state_ == RouteRunnerState::Finished; }
 	uint16_t currentIndex() const { return index_; }

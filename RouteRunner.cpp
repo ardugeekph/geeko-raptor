@@ -56,7 +56,7 @@ void RouteRunner::setTurnScale(float scale) {
 	turnScale_ = scale;
 }
 
-void RouteRunner::setLineFollowTunings(float kp, float ki, float kd) {
+void RouteRunner::setLineFollowPID(float kp, float ki, float kd) {
 	lineFollowKp_ = kp;
 	lineFollowKi_ = ki;
 	lineFollowKd_ = kd;
