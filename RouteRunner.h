@@ -163,7 +163,7 @@ inline RouteActionA makeActionTurnRight(int16_t speed, float degrees) {
 }
 
 inline LineFollowPID defaultLineFollowPID() {
-	LineFollowPID pid = {0.f, 0.f, 0.f, false};
+	LineFollowPID pid = {0.15f, 0.f, 0.3f, false};
 	return pid;
 }
 
@@ -313,9 +313,9 @@ private:
 	int16_t maxActionForwardCorrection_ = 40;
 	float turnScale_ = 1.0f;
 
-	float lineFollowKp_ = 0.13f;
+	float lineFollowKp_ = 0.15f;
 	float lineFollowKi_ = 0.0f;
-	float lineFollowKd_ = 0.15f;
+	float lineFollowKd_ = 0.3f;
 
 	LinePolarity linePolarity_ = LinePolarity::Dark;
 
