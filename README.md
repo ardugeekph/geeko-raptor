@@ -87,7 +87,7 @@ void loop() {
 - **Line polarity:** use `LinePolarity::Dark` (default) for a dark line on a light surface, or `LinePolarity::Light` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload or as the third argument to `makeLineTrigger(...)`, e.g. `makeSpeedSegment(130, stopByTime(900), LinePolarity::Light)` or `makeLineTrigger(IR_MASK_INNER_LEFT, LineLevel::Mid, LinePolarity::Light)`. Speed segments use inverted `getPos(true)` internally; mask line triggers invert each masked channel reading (`1023 - value`) before threshold compare.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
-See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs.
+See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs. In that demo, **OK** starts/restarts the route; **\*** runs `calibrateSensors()` and **#** runs `calibrateStraightDrive()`; keys **0 / 1 / 2** resume at step index (after OK).
 
 ### Resume from index (IR in sketch layer)
 
@@ -95,21 +95,47 @@ Keep IR decoding in your sketch/app code, then call the runner resume API:
 
 ```cpp
 #include <IRremote.h>
+#include <IrRemoteKeys.h>
 IrReceiver.begin(IR_REMOTE_SENSOR);
 
 if (IrReceiver.decode()) {
   uint32_t code = IrReceiver.decodedIRData.decodedRawData;
-  int target = -1;
-  if (code == 0xFF6897) target = 0; // key 0
-  else if (code == 0xFF30CF) target = 1; // key 1
-  else if (code == 0xFF18E7) target = 2; // key 2
-
-  if (target >= 0) {
-    runner.setIndex((uint16_t)target, robot);
+  if (code == IR_KEY_OK) {
+    routeStarted = true;
+    runner.reset();
+    robot.stop();
+  } else if (code == IR_KEY_STAR) {
+    robot.stop();
+    robot.calibrateSensors();
+  } else if (code == IR_KEY_HASH) {
+    robot.stop();
+    robot.calibrateStraightDrive();
+  } else {
+    int target = -1;
+    if (code == IR_KEY_0) target = 0;
+    else if (code == IR_KEY_1) target = 1;
+    else if (code == IR_KEY_2) target = 2;
+    if (target >= 0) {
+      runner.setIndex((uint16_t)target, robot);
+    }
   }
   IrReceiver.resume();
 }
 ```
+
+### IrRemoteKeys (`IrRemoteKeys.h`)
+
+`decodedRawData` constants for the Geeko Raptor IR remote. Include with `IRremote.h` in sketches:
+
+```cpp
+#include <IrRemoteKeys.h>
+
+// Digits 0–9: IR_KEY_0 .. IR_KEY_9
+// * # : IR_KEY_STAR, IR_KEY_HASH
+// D-pad: IR_KEY_UP, IR_KEY_DOWN, IR_KEY_LEFT, IR_KEY_RIGHT, IR_KEY_OK
+```
+
+Debug unknown codes: `Serial.println(IrReceiver.decodedIRData.decodedRawData, HEX);`
 
 ## Essential Functions
 

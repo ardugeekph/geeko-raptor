@@ -1,5 +1,6 @@
 #include <IRremote.h>
 
+// Compare received codes with constants in IrRemoteKeys.h (Geeko Raptor remote).
 
 void setup() {
   pinMode(BUZZER_PIN, OUTPUT);
