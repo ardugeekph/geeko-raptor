@@ -87,7 +87,7 @@ void loop() {
 - **Line polarity:** use `LinePolarity::Dark` (default) for a dark line on a light surface, or `LinePolarity::Light` for a light line on a dark surface. Pass as the optional trailing argument to any `makeSpeedSegment(...)` overload or as the third argument to `makeLineTrigger(...)`, e.g. `makeSpeedSegment(130, stopByTime(900), LinePolarity::Light)` or `makeLineTrigger(IR_MASK_INNER_LEFT, LineLevel::Mid, LinePolarity::Light)`. Speed segments use inverted `getPos(true)` internally; mask line triggers invert each masked channel reading (`1023 - value`) before threshold compare.
 - **Resume API:** use `runner.setIndex(index, robot)` to jump to any step and re-enter `WaitingTrigger` safely. Use `runner.stepCount()` for bounds checks.
 
-See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs. In that demo, **OK** starts/restarts the route; **\*** runs `calibrateSensors()` and **#** runs `calibrateStraightDrive()`; keys **0 / 1 / 2** resume at step index (after OK).
+See `examples/route_runner_demo/route_runner_demo.ino` for a full plan and encoder ISRs. In that demo, **OK** starts/restarts the route; **\*** runs `calibrateSensors()` and **#** runs `calibrateStraightDrive()`; **0** stops the route; keys **1 / 2** resume at step index (after OK).
 
 ### Resume from index (IR in sketch layer)
 
@@ -110,10 +110,12 @@ if (IrReceiver.decode()) {
   } else if (code == IR_KEY_HASH) {
     robot.stop();
     robot.calibrateStraightDrive();
-  } else {
+  } else if (code == IR_KEY_0) {
+    routeStarted = false;
+    robot.stop();
+  } else if (routeStarted) {
     int target = -1;
-    if (code == IR_KEY_0) target = 0;
-    else if (code == IR_KEY_1) target = 1;
+    if (code == IR_KEY_1) target = 1;
     else if (code == IR_KEY_2) target = 2;
     if (target >= 0) {
       runner.setIndex((uint16_t)target, robot);

@@ -9,7 +9,8 @@
  *   OK -> start / restart route from step 0
  *   *  -> calibrateSensors()
  *   #  -> calibrateStraightDrive() (10s manual push, saves EEPROM trim)
- *   0/1/2 -> resume route at step index (after OK)
+ *   0 -> stop route (motors off; press OK to restart)
+ *   1/2 -> resume route at step index (after OK)
  */
 
 #include <GeekoBot.h>
@@ -81,10 +82,13 @@ void loop() {
 			robot.calibrateStraightDrive();
 			Serial.print(F("Straight cal done. pwmTrim="));
 			Serial.println(robot.getStraightPwmTrim());
+		} else if (code == IR_KEY_0) {
+			routeStarted = false;
+			robot.stop();
+			Serial.println(F("IR 0 -> route stopped"));
 		} else if (routeStarted) {
 			int targetIndex = -1;
-			if (code == IR_KEY_0) targetIndex = 0;
-			else if (code == IR_KEY_1) targetIndex = 1;
+			if (code == IR_KEY_1) targetIndex = 1;
 			else if (code == IR_KEY_2) targetIndex = 2;
 
 			if (targetIndex >= 0) {
