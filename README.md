@@ -79,7 +79,18 @@ void loop() {
                    armNextTriggerAfterDistance(1.5f))
   ```
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionBackward(speed, stop)`. Turns use degrees: `makeActionTurnLeft(speed, degrees)`, `makeActionTurnRight(speed, degrees)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
-- **Action-only steps:** use `makeStep(action)` or `makeStep(trigger, action)` to omit speed segments (both default to `makeNoSpeedSegment()`). Chain manual moves — forward, backward, turn — and the runner advances **without stopping** between steps that use `makeNoTrigger()` (the default for 1-arg `makeStep`). When the next step has a real trigger (line, distance, rules), motors stop and wait as usual.
+- **Action series (one step):** run multiple actions in order without stopping between them using `makeActions(...)` (up to 8 actions per step; stored in a per-call static array in flash, not inside `RouteStep`, to save SRAM on ATmega328P). One buzzer beep when the whole step finishes.
+  ```cpp
+  makeStep(makeActions(
+    makeActionTurnRight(50, 90),
+    makeActionForward(50, stopByDistance(5)),
+    makeActionBackward(50, stopByDistance(5)),
+    makeActionTurnLeft(100, 70),
+    makeActionForward(255, stopByDistance(3))
+  ))
+  ```
+  Or define a named array and pass it with `makeActionsFrom(PARKING)` (same pattern as line-rules triggers). Single-action `makeStep(trigger, action, ...)` still uses an inline embedded action (~23 bytes/step in RAM vs ~160 with the old fixed 8-slot list).
+- **Action-only steps:** use `makeStep(action)` or `makeStep(trigger, action)` to omit speed segments (both default to `makeNoSpeedSegment()`). Chain manual moves — forward, backward, turn — and the runner advances **without stopping** between steps that use `makeNoTrigger()` (the default for 1-arg `makeStep`). When the next step has a real trigger (line, distance, rules), motors stop and wait as usual. Prefer `makeActions(...)` when several moves belong to one logical step.
   ```cpp
   const RouteStep PLAN[] = {
     makeStep(makeActionForward(200, stopByDistance(2.0f))),

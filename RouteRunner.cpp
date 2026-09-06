@@ -4,6 +4,7 @@ void RouteRunner::begin(const RouteStep* plan, uint16_t count) {
 	plan_ = plan;
 	count_ = count;
 	index_ = 0;
+	actionIndex_ = 0;
 	state_ = (plan && count > 0) ? RouteRunnerState::WaitingTrigger : RouteRunnerState::Finished;
 	triggerDistBaseline_ = 0.f;
 	segmentStartMs_ = 0;
@@ -26,6 +27,7 @@ bool RouteRunner::setIndex(uint16_t index, GeekoBot& robot) {
 	}
 
 	index_ = index;
+	actionIndex_ = 0;
 	segmentStartMs_ = 0;
 	segmentDistBaseline_ = 0.f;
 	linePolarity_ = LinePolarity::Dark;
@@ -205,6 +207,37 @@ void RouteRunner::notifyStepComplete_(GeekoBot& robot) {
 	robot.buzzer.pulse();
 }
 
+bool RouteRunner::hasAction_(const RouteStep& step) {
+	return step.actions.count > 0 &&
+		actionAt_(step.actions, 0).kind != RouteActionKind::None;
+}
+
+const RouteActionA& RouteRunner::actionAt_(const RouteActionList& list, uint8_t index) {
+	if (list.items != nullptr) {
+		return list.items[index];
+	}
+	return list.embedded;
+}
+
+const RouteActionA& RouteRunner::currentAction_(const RouteStep& step, uint8_t actionIndex) {
+	return actionAt_(step.actions, actionIndex);
+}
+
+void RouteRunner::beginActionPhase_(GeekoBot& robot) {
+	actionIndex_ = 0;
+	startAction_(robot);
+	state_ = RouteRunnerState::RunningAction;
+}
+
+void RouteRunner::onActionComplete_(GeekoBot& robot, const RouteStep& step) {
+	if (actionIndex_ + 1 < step.actions.count) {
+		actionIndex_++;
+		startAction_(robot);
+		return;
+	}
+	skipActionAndBeginSpeedSegments_(robot, step);
+}
+
 void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
 	index_++;
 	notifyStepComplete_(robot);
@@ -216,13 +249,12 @@ void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
 
 	triggerDistBaseline_ = maxWheelDistance_(robot);
 	const RouteStep& step = plan_[index_];
-	if (step.action.kind == RouteActionKind::None) {
+	if (!hasAction_(step)) {
 		skipActionAndBeginSpeedSegments_(robot, step);
 		return;
 	}
 
-	startAction_(robot);
-	state_ = RouteRunnerState::RunningAction;
+	beginActionPhase_(robot);
 }
 
 bool RouteRunner::stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot) {
@@ -282,9 +314,8 @@ void RouteRunner::advanceToNextStep_(GeekoBot& robot) {
 		return;
 	}
 
-	if (step.action.kind != RouteActionKind::None) {
-		startAction_(robot);
-		state_ = RouteRunnerState::RunningAction;
+	if (hasAction_(step)) {
+		beginActionPhase_(robot);
 	} else {
 		skipActionAndBeginSpeedSegments_(robot, step);
 	}
@@ -402,8 +433,7 @@ static bool isTurnAction_(RouteActionKind kind) {
 	return kind == RouteActionKind::TurnLeft || kind == RouteActionKind::TurnRight;
 }
 
-bool RouteRunner::actionDone_(const RouteStep& step, GeekoBot& robot) {
-	const RouteActionA& action = step.action;
+bool RouteRunner::actionDone_(const RouteActionA& action, GeekoBot& robot) {
 	if (isTurnAction_(action.kind)) {
 		return turnSatisfied_(action, actionDirBaselineL_, actionDirBaselineR_, robot, turnScale_);
 	}
@@ -437,25 +467,25 @@ void RouteRunner::tick(GeekoBot& robot) {
 			const bool fired = triggerFired_(step.trigger, irVals_, triggerDistBaseline_, robot);
 
 			if (fired) {
-				if (step.action.kind == RouteActionKind::None) {
+				if (!hasAction_(step)) {
 					skipActionAndBeginSpeedSegments_(robot, step);
 				} else {
-					startAction_(robot);
-					state_ = RouteRunnerState::RunningAction;
+					beginActionPhase_(robot);
 				}
 			}
 			break;
 		}
 
 		case RouteRunnerState::RunningAction: {
-			if (step.action.kind == RouteActionKind::None) {
+			if (!hasAction_(step)) {
 				skipActionAndBeginSpeedSegments_(robot, step);
 				break;
 			}
 
-			applyActionATick_(robot, step.action);
-			if (actionDone_(step, robot)) {
-				skipActionAndBeginSpeedSegments_(robot, step);
+			const RouteActionA& action = currentAction_(step, actionIndex_);
+			applyActionATick_(robot, action);
+			if (actionDone_(action, robot)) {
+				onActionComplete_(robot, step);
 			}
 			break;
 		}

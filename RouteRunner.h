@@ -59,9 +59,17 @@ struct RouteSpeedSegment {
 	TriggerArm nextTriggerArm;
 };
 
+static constexpr uint8_t kMaxRouteActionsPerStep = 8;
+
+struct RouteActionList {
+	const RouteActionA* items;
+	uint8_t count;
+	RouteActionA embedded;
+};
+
 struct RouteStep {
 	RouteTrigger trigger;
-	RouteActionA action;
+	RouteActionList actions;
 	RouteSpeedSegment speedA;
 	RouteSpeedSegment speedB;
 };
@@ -186,6 +194,32 @@ inline RouteActionA makeActionTurnRight(int16_t speed, float degrees) {
 	return a;
 }
 
+inline RouteActionList makeActionList(const RouteActionA& action) {
+	RouteActionList list = {};
+	if (action.kind != RouteActionKind::None) {
+		list.embedded = action;
+		list.items = nullptr;
+		list.count = 1;
+	}
+	return list;
+}
+
+template<uint8_t N>
+inline RouteActionList makeActionsFrom(const RouteActionA (&actions)[N]) {
+	RouteActionList list = {actions, N, {}};
+	return list;
+}
+
+#define makeActions(...) \
+	([]() -> RouteActionList { \
+		static const RouteActionA _routeActions[] = {__VA_ARGS__}; \
+		return RouteActionList{ \
+			_routeActions, \
+			(uint8_t)(sizeof(_routeActions) / sizeof(_routeActions[0])), \
+			{} \
+		}; \
+	}())
+
 inline LineFollowPID defaultLineFollowPID() {
 	LineFollowPID pid = {0.15f, 0.f, 0.3f, false};
 	return pid;
@@ -270,11 +304,40 @@ inline RouteSpeedSegment makeNoSpeedSegment() {
 
 inline RouteStep makeStep(
 	const RouteTrigger& trigger,
+	const RouteActionList& actions,
+	const RouteSpeedSegment& speedA
+) {
+	RouteStep step = {trigger, actions, speedA, makeNoSpeedSegment()};
+	return step;
+}
+
+inline RouteStep makeStep(
+	const RouteTrigger& trigger,
+	const RouteActionList& actions,
+	const RouteSpeedSegment& speedA,
+	const RouteSpeedSegment& speedB
+) {
+	RouteStep step = {trigger, actions, speedA, speedB};
+	return step;
+}
+
+inline RouteStep makeStep(
+	const RouteTrigger& trigger,
+	const RouteActionList& actions
+) {
+	return makeStep(trigger, actions, makeNoSpeedSegment());
+}
+
+inline RouteStep makeStep(const RouteActionList& actions) {
+	return makeStep(makeNoTrigger(), actions);
+}
+
+inline RouteStep makeStep(
+	const RouteTrigger& trigger,
 	const RouteActionA& action,
 	const RouteSpeedSegment& speedA
 ) {
-	RouteStep step = {trigger, action, speedA, makeNoSpeedSegment()};
-	return step;
+	return makeStep(trigger, makeActionList(action), speedA);
 }
 
 inline RouteStep makeStep(
@@ -283,19 +346,18 @@ inline RouteStep makeStep(
 	const RouteSpeedSegment& speedA,
 	const RouteSpeedSegment& speedB
 ) {
-	RouteStep step = {trigger, action, speedA, speedB};
-	return step;
+	return makeStep(trigger, makeActionList(action), speedA, speedB);
 }
 
 inline RouteStep makeStep(
 	const RouteTrigger& trigger,
 	const RouteActionA& action
 ) {
-	return makeStep(trigger, action, makeNoSpeedSegment());
+	return makeStep(trigger, makeActionList(action));
 }
 
 inline RouteStep makeStep(const RouteActionA& action) {
-	return makeStep(makeNoTrigger(), action);
+	return makeStep(makeNoTrigger(), makeActionList(action));
 }
 
 enum class RouteRunnerState : uint8_t {
@@ -337,12 +399,18 @@ private:
 
 	static bool nextTriggerArmed_(const TriggerArm& arm, unsigned long startMs, float startDist, GeekoBot& robot);
 
+	static bool hasAction_(const RouteStep& step);
+	static const RouteActionA& actionAt_(const RouteActionList& list, uint8_t index);
+	static const RouteActionA& currentAction_(const RouteStep& step, uint8_t actionIndex);
+
 	bool nextStepTriggerFired_(GeekoBot& robot);
-	bool actionDone_(const RouteStep& step, GeekoBot& robot);
+	bool actionDone_(const RouteActionA& action, GeekoBot& robot);
 	bool speedSegmentDone_(const RouteSpeedSegment& segment, unsigned long startMs, float startDist, GeekoBot& robot);
 	void advanceToNextStepAction_(GeekoBot& robot);
 	void advanceToNextStep_(GeekoBot& robot);
 	void notifyStepComplete_(GeekoBot& robot);
+	void onActionComplete_(GeekoBot& robot, const RouteStep& step);
+	void beginActionPhase_(GeekoBot& robot);
 
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);
@@ -356,6 +424,7 @@ private:
 	const RouteStep* plan_ = nullptr;
 	uint16_t count_ = 0;
 	uint16_t index_ = 0;
+	uint8_t actionIndex_ = 0;
 	RouteRunnerState state_ = RouteRunnerState::Finished;
 
 	float triggerDistBaseline_ = 0.f;
