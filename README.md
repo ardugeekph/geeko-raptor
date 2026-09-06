@@ -71,6 +71,13 @@ void loop() {
 - **Tuning trigger values:** run `examples/ir_calibrated_monitor/ir_calibrated_monitor.ino`, place the robot at the trigger pose, and read Serial output (`robot.sensor.printIrCalibrated()`). Use those numbers to set each `irRule(ch, min, max)`.
 - **Stop conditions:** use `stopByTime(ms)` or `stopByDistance(inches)` on `Action` and on `Speed` when you want a timed or distance limit. `stopByTime(0)` / `stopByDistance(0)` skip that segment immediately.
 - **Speed until next step:** `makeSpeedSegment(speed)` (or `makeSpeedSegment(speed, stopUntilNextTrigger())`) line-follows at `speed` until the **next** step’s trigger fires, then starts that step’s `Action` without stopping in between. Use `makeSpeedSegment(speed, lineFollowPID(kp, ki, kd))` for the same behaviour with per-segment PID.
+- **Next-trigger arm (curved track):** on narrow sensor arrays (~80 mm), the next step’s line trigger can fire early on curves while still in a until-next-trigger segment. Delay when the next trigger is checked with `armNextTriggerAfterDistance(inches)` or `armNextTriggerAfterTime(ms)` as the last argument to `makeSpeedSegment(...)`. The arm timer starts when **that** speed segment begins. Start with ~1.0–2.0 in on curved sections and tune on your track.
+  ```cpp
+  makeSpeedSegment(255, armNextTriggerAfterDistance(1.5f))
+  makeSpeedSegment(150, lineFollowPID(0.13f, 0.0f, 0.15f), armNextTriggerAfterDistance(1.5f))
+  makeSpeedSegment(130, stopUntilNextTrigger(), lineFollowPID(0.13f, 0.0f, 0.15f),
+                   armNextTriggerAfterDistance(1.5f))
+  ```
 - **Action:** semantic action with speed and stop condition, e.g. `makeActionForward(speed, stop)`, `makeActionBackward(speed, stop)`. Turns use degrees: `makeActionTurnLeft(speed, degrees)`, `makeActionTurnRight(speed, degrees)`. Use `makeNoAction()` to skip the action phase and go straight to SpeedA line-follow.
 - **Action-only steps:** use `makeStep(action)` or `makeStep(trigger, action)` to omit speed segments (both default to `makeNoSpeedSegment()`). Chain manual moves — forward, backward, turn — and the runner advances **without stopping** between steps that use `makeNoTrigger()` (the default for 1-arg `makeStep`). When the next step has a real trigger (line, distance, rules), motors stop and wait as usual.
   ```cpp

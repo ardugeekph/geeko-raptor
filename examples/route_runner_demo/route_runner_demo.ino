@@ -43,7 +43,12 @@ const RouteStep PLAN[] = {
 	makeStep(
 		makeDistanceTrigger(0.f),
 		makeActionForward(100, stopByDistance(1.5f)),
-		makeSpeedSegment(130, lineFollowPID(0.13f, 0.0f, 0.15f))
+		makeSpeedSegment(
+			130,
+			stopUntilNextTrigger(),
+			lineFollowPID(0.13f, 0.0f, 0.15f),
+			armNextTriggerAfterDistance(1.5f)
+		)
 	),
 	makeStep(makeActionTurnLeft(150, 90.0f)),
 	makeStep(makeActionForward(100, stopByDistance(1.0f))),

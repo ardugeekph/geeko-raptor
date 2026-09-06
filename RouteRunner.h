@@ -43,11 +43,20 @@ struct LineFollowPID {
 	bool custom;
 };
 
+enum class TriggerArmKind : uint8_t { Immediate, ByTime, ByDistance };
+
+struct TriggerArm {
+	TriggerArmKind kind;
+	uint32_t timeMs;
+	float distanceInches;
+};
+
 struct RouteSpeedSegment {
 	int16_t speed;
 	StopCondition stop;
 	LineFollowPID lineFollowPid;
 	LinePolarity linePolarity;
+	TriggerArm nextTriggerArm;
 };
 
 struct RouteStep {
@@ -70,6 +79,21 @@ inline StopCondition stopByDistance(float inches) {
 inline StopCondition stopUntilNextTrigger() {
 	StopCondition stop = {StopKind::UntilNextTrigger, 0, 0.f};
 	return stop;
+}
+
+inline TriggerArm armNextTriggerImmediately() {
+	TriggerArm arm = {TriggerArmKind::Immediate, 0, 0.f};
+	return arm;
+}
+
+inline TriggerArm armNextTriggerAfterTime(uint32_t ms) {
+	TriggerArm arm = {TriggerArmKind::ByTime, ms, 0.f};
+	return arm;
+}
+
+inline TriggerArm armNextTriggerAfterDistance(float inches) {
+	TriggerArm arm = {TriggerArmKind::ByDistance, 0, inches};
+	return arm;
 }
 
 inline RouteTrigger makeNoTrigger() {
@@ -174,18 +198,22 @@ inline LineFollowPID lineFollowPID(float kp, float ki, float kd) {
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
-	LinePolarity linePolarity = LinePolarity::Dark
+	LinePolarity linePolarity = LinePolarity::Dark,
+	const TriggerArm& nextTriggerArm = armNextTriggerImmediately()
 ) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), defaultLineFollowPID(), linePolarity};
+	RouteSpeedSegment segment = {
+		speed, stopUntilNextTrigger(), defaultLineFollowPID(), linePolarity, nextTriggerArm
+	};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const StopCondition& stop,
-	LinePolarity linePolarity = LinePolarity::Dark
+	LinePolarity linePolarity = LinePolarity::Dark,
+	const TriggerArm& nextTriggerArm = armNextTriggerImmediately()
 ) {
-	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID(), linePolarity};
+	RouteSpeedSegment segment = {speed, stop, defaultLineFollowPID(), linePolarity, nextTriggerArm};
 	return segment;
 }
 
@@ -193,19 +221,47 @@ inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const StopCondition& stop,
 	const LineFollowPID& lineFollowPid,
-	LinePolarity linePolarity = LinePolarity::Dark
+	LinePolarity linePolarity = LinePolarity::Dark,
+	const TriggerArm& nextTriggerArm = armNextTriggerImmediately()
 ) {
-	RouteSpeedSegment segment = {speed, stop, lineFollowPid, linePolarity};
+	RouteSpeedSegment segment = {speed, stop, lineFollowPid, linePolarity, nextTriggerArm};
 	return segment;
 }
 
 inline RouteSpeedSegment makeSpeedSegment(
 	int16_t speed,
 	const LineFollowPID& lineFollowPid,
-	LinePolarity linePolarity = LinePolarity::Dark
+	LinePolarity linePolarity = LinePolarity::Dark,
+	const TriggerArm& nextTriggerArm = armNextTriggerImmediately()
 ) {
-	RouteSpeedSegment segment = {speed, stopUntilNextTrigger(), lineFollowPid, linePolarity};
+	RouteSpeedSegment segment = {
+		speed, stopUntilNextTrigger(), lineFollowPid, linePolarity, nextTriggerArm
+	};
 	return segment;
+}
+
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const TriggerArm& nextTriggerArm
+) {
+	return makeSpeedSegment(speed, LinePolarity::Dark, nextTriggerArm);
+}
+
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const LineFollowPID& lineFollowPid,
+	const TriggerArm& nextTriggerArm
+) {
+	return makeSpeedSegment(speed, lineFollowPid, LinePolarity::Dark, nextTriggerArm);
+}
+
+inline RouteSpeedSegment makeSpeedSegment(
+	int16_t speed,
+	const StopCondition& stop,
+	const LineFollowPID& lineFollowPid,
+	const TriggerArm& nextTriggerArm
+) {
+	return makeSpeedSegment(speed, stop, lineFollowPid, LinePolarity::Dark, nextTriggerArm);
 }
 
 inline RouteSpeedSegment makeNoSpeedSegment() {
@@ -279,9 +335,11 @@ private:
 	static bool stopSatisfied_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
 	static bool turnSatisfied_(const RouteActionA& action, float dirBaselineL, float dirBaselineR, GeekoBot& robot, float turnScale);
 
+	static bool nextTriggerArmed_(const TriggerArm& arm, unsigned long startMs, float startDist, GeekoBot& robot);
+
 	bool nextStepTriggerFired_(GeekoBot& robot);
 	bool actionDone_(const RouteStep& step, GeekoBot& robot);
-	bool speedSegmentDone_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
+	bool speedSegmentDone_(const RouteSpeedSegment& segment, unsigned long startMs, float startDist, GeekoBot& robot);
 	void advanceToNextStepAction_(GeekoBot& robot);
 	void advanceToNextStep_(GeekoBot& robot);
 	void notifyStepComplete_(GeekoBot& robot);

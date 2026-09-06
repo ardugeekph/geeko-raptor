@@ -167,16 +167,38 @@ bool RouteRunner::nextStepTriggerFired_(GeekoBot& robot) {
 	return triggerFired_(tr, irVals_, triggerDistBaseline_, robot);
 }
 
-bool RouteRunner::speedSegmentDone_(
-	const StopCondition& stop,
+bool RouteRunner::nextTriggerArmed_(
+	const TriggerArm& arm,
 	unsigned long startMs,
 	float startDist,
 	GeekoBot& robot
 ) {
-	if (stopIsUntilNextTrigger_(stop)) {
+	switch (arm.kind) {
+		case TriggerArmKind::Immediate:
+			return true;
+		case TriggerArmKind::ByTime:
+			return (millis() - startMs) >= arm.timeMs;
+		case TriggerArmKind::ByDistance:
+			return (maxWheelDistance_(robot) - startDist) >= arm.distanceInches;
+		default:
+			return true;
+	}
+}
+
+bool RouteRunner::speedSegmentDone_(
+	const RouteSpeedSegment& segment,
+	unsigned long startMs,
+	float startDist,
+	GeekoBot& robot
+) {
+	if (stopIsUntilNextTrigger_(segment.stop)) {
+		if (!nextTriggerArmed_(segment.nextTriggerArm, startMs, startDist, robot)) {
+			return false;
+		}
 		return nextStepTriggerFired_(robot);
 	}
-	return stopIsNoOp_(stop) || stopSatisfied_(stop, startMs, startDist, robot);
+	return stopIsNoOp_(segment.stop) ||
+		stopSatisfied_(segment.stop, startMs, startDist, robot);
 }
 
 void RouteRunner::notifyStepComplete_(GeekoBot& robot) {
@@ -441,7 +463,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 		case RouteRunnerState::RunningSpeedA: {
 			applyLineFollowTick_(robot, step.speedA.speed);
 
-			if (speedSegmentDone_(step.speedA.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
+			if (speedSegmentDone_(step.speedA, segmentStartMs_, segmentDistBaseline_, robot)) {
 				if (stopIsUntilNextTrigger_(step.speedA.stop)) {
 					advanceToNextStepAction_(robot);
 				} else if (stopIsNoOp_(step.speedB.stop)) {
@@ -458,7 +480,7 @@ void RouteRunner::tick(GeekoBot& robot) {
 		case RouteRunnerState::RunningSpeedB: {
 			applyLineFollowTick_(robot, step.speedB.speed);
 
-			if (speedSegmentDone_(step.speedB.stop, segmentStartMs_, segmentDistBaseline_, robot)) {
+			if (speedSegmentDone_(step.speedB, segmentStartMs_, segmentDistBaseline_, robot)) {
 				if (stopIsUntilNextTrigger_(step.speedB.stop)) {
 					advanceToNextStepAction_(robot);
 				} else {
