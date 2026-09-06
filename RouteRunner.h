@@ -284,6 +284,7 @@ private:
 	bool speedSegmentDone_(const StopCondition& stop, unsigned long startMs, float startDist, GeekoBot& robot);
 	void advanceToNextStepAction_(GeekoBot& robot);
 	void advanceToNextStep_(GeekoBot& robot);
+	void notifyStepComplete_(GeekoBot& robot);
 
 	void enterWaitingTrigger_(GeekoBot& robot);
 	void skipActionAndBeginSpeedSegments_(GeekoBot& robot, const RouteStep& step);

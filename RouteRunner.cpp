@@ -179,8 +179,13 @@ bool RouteRunner::speedSegmentDone_(
 	return stopIsNoOp_(stop) || stopSatisfied_(stop, startMs, startDist, robot);
 }
 
+void RouteRunner::notifyStepComplete_(GeekoBot& robot) {
+	robot.buzzer.pulse();
+}
+
 void RouteRunner::advanceToNextStepAction_(GeekoBot& robot) {
 	index_++;
+	notifyStepComplete_(robot);
 	if (index_ >= count_) {
 		state_ = RouteRunnerState::Finished;
 		robot.stop();
@@ -240,6 +245,7 @@ void RouteRunner::enterWaitingTrigger_(GeekoBot& robot) {
 
 void RouteRunner::advanceToNextStep_(GeekoBot& robot) {
 	index_++;
+	notifyStepComplete_(robot);
 	if (index_ >= count_) {
 		state_ = RouteRunnerState::Finished;
 		robot.stop();

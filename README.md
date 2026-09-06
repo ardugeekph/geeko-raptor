@@ -215,7 +215,10 @@ bool inverted = robot.motorLeft.encoder.isCountInverted();       // true after m
 ### Buzzer (`robot.buzzer`)
 ```cpp
 robot.buzzer.beep(bool on);                        // Turn buzzer on/off
+robot.buzzer.pulse(durationMs);                    // Short non-blocking beep (default 80 ms)
 ```
+
+Call `robot.update()` each loop so `buzzer.tick()` can end a pulse without blocking. RouteRunner beeps once per completed step automatically.
 
 ### **PIDController (For motor correction)**
 

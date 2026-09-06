@@ -167,4 +167,5 @@ void GeekoBot::stop() {
 void GeekoBot::update() {
 	motorLeft.encoder.update();
 	motorRight.encoder.update();
+	buzzer.tick();
 }
